@@ -56,7 +56,7 @@ model Product {
   categoryId        String?
   productCategory   ProductCategory? @relation("ProductToCategory", fields: [categoryId], references: [id])
   barcode           String?
-  supplier          String
+  supplier          String?
   taxRate           Float           @default(0)
   description       String?
   isActive          Boolean         @default(true)

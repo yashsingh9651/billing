@@ -2,32 +2,62 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, SubmitHandler } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useCreateProductMutation } from '@/redux/services/productApiSlice';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
-  quantity: z.coerce.number().min(0, 'Quantity cannot be negative'),
-  buyingPrice: z.coerce.number().min(0, 'Buying price cannot be negative'),
-  sellingPrice: z.coerce.number().min(0, 'Selling price cannot be negative'),
-  wholesalePrice: z.coerce.number().min(0, 'Wholesale price cannot be negative'),
-  discountPercentage: z.coerce.number().min(0, 'Discount cannot be negative').max(100, 'Discount cannot be more than 100%'),
-  mrp: z.coerce.number().min(0, 'MRP cannot be negative'),
+  quantity: z
+    .union([z.string(), z.number()])
+    .transform((val) => (val === '' ? 0 : Number(val)))
+    .refine((val) => !isNaN(val), { message: 'Must be a number' })
+    .refine((val) => val >= 0, { message: 'Quantity cannot be negative' }),
+  buyingPrice: z
+    .union([z.string(), z.number()])
+    .transform((val) => (val === '' ? 0 : Number(val)))
+    .refine((val) => !isNaN(val), { message: 'Must be a number' })
+    .refine((val) => val >= 0, { message: 'Buying price cannot be negative' }),
+  sellingPrice: z
+    .union([z.string(), z.number()])
+    .transform((val) => (val === '' ? 0 : Number(val)))
+    .refine((val) => !isNaN(val), { message: 'Must be a number' })
+    .refine((val) => val >= 0, { message: 'Selling price cannot be negative' }),
+  wholesalePrice: z
+    .union([z.string(), z.number()])
+    .transform((val) => (val === '' ? 0 : Number(val)))
+    .refine((val) => !isNaN(val), { message: 'Must be a number' })
+    .refine((val) => val >= 0, { message: 'Wholesale price cannot be negative' }),
+  discountPercentage: z
+    .union([z.string(), z.number()])
+    .transform((val) => (val === '' ? 0 : Number(val)))
+    .refine((val) => !isNaN(val), { message: 'Must be a number' })
+    .refine((val) => val >= 0, { message: 'Discount cannot be negative' })
+    .refine((val) => val <= 100, { message: 'Discount cannot be more than 100%' }),
+  mrp: z
+    .union([z.string(), z.number()])
+    .transform((val) => (val === '' ? 0 : Number(val)))
+    .refine((val) => !isNaN(val), { message: 'Must be a number' })
+    .refine((val) => val >= 0, { message: 'MRP cannot be negative' }),
   unit: z.string().min(1, 'Unit is required'),
   category: z.string().min(1, 'Category is required'),
   barcode: z.string().optional(),
-  supplier: z.string().min(1, 'Supplier is required'),
-  taxRate: z.coerce.number().min(0, 'Tax rate cannot be negative'),
-  description: z.string().optional(),
+  taxRate: z
+    .union([z.string(), z.number()])
+    .transform((val) => (val === '' ? 0 : Number(val)))
+    .refine((val) => !isNaN(val), { message: 'Must be a number' })
+    .refine((val) => val >= 0, { message: 'Tax rate cannot be negative' }),
   isActive: z.boolean(),
 });
 
+// Use z.infer to get the proper types
 type ProductFormData = z.infer<typeof productSchema>;
 
 export default function AddProductPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createProduct] = useCreateProductMutation();
 
   const {
     register,
@@ -35,6 +65,8 @@ export default function AddProductPage() {
     formState: { errors },
   } = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
+    mode: 'onBlur',
+    shouldUseNativeValidation: false,
     defaultValues: {
       name: '',
       quantity: 0,
@@ -46,32 +78,16 @@ export default function AddProductPage() {
       unit: 'piece',
       category: '',
       barcode: '',
-      supplier: '',
       taxRate: 0,
-      description: '',
       isActive: true,
     },
   });
 
-  const onSubmit = async (data: ProductFormData) => {
+  const onSubmit: SubmitHandler<ProductFormData> = async (data) => {
     setIsSubmitting(true);
     
     try {
-      // Call the API to create a new product
-      const response = await fetch('/api/products', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to add product');
-      }
-      
-      // Redirect to products page on success
+      const result = await createProduct(data).unwrap();
       router.push('/dashboard/products');
       router.refresh();
     } catch (error) {
@@ -91,7 +107,7 @@ export default function AddProductPage() {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-8 divide-y divide-gray-200">
+      <form onSubmit={handleSubmit(onSubmit as any)} className="space-y-8 divide-y divide-gray-200">
         <div className="space-y-8 divide-y divide-gray-200">
           <div className="pt-8">
             <div>
@@ -109,7 +125,7 @@ export default function AddProductPage() {
                     type="text"
                     id="name"
                     {...register('name')}
-                    className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                    className="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                   />
                   {errors.name && (
                     <p className="mt-2 text-sm text-red-600">{errors.name.message}</p>
@@ -126,7 +142,7 @@ export default function AddProductPage() {
                     type="text"
                     id="category"
                     {...register('category')}
-                    className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                    className="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                   />
                   {errors.category && (
                     <p className="mt-2 text-sm text-red-600">{errors.category.message}</p>
@@ -142,8 +158,9 @@ export default function AddProductPage() {
                   <input
                     type="number"
                     id="quantity"
+                    step="1"
                     {...register('quantity')}
-                    className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                    className="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                   />
                   {errors.quantity && (
                     <p className="mt-2 text-sm text-red-600">{errors.quantity.message}</p>
@@ -156,37 +173,15 @@ export default function AddProductPage() {
                   Unit
                 </label>
                 <div className="mt-2">
-                  <select
-                    id="unit"
-                    {...register('unit')}
-                    className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:max-w-xs sm:text-sm sm:leading-6"
-                  >
-                    <option value="piece">Piece</option>
-                    <option value="kg">Kilogram</option>
-                    <option value="gram">Gram</option>
-                    <option value="liter">Liter</option>
-                    <option value="dozen">Dozen</option>
-                    <option value="box">Box</option>
-                  </select>
-                  {errors.unit && (
-                    <p className="mt-2 text-sm text-red-600">{errors.unit.message}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="sm:col-span-3">
-                <label htmlFor="supplier" className="block text-sm font-medium leading-6 text-gray-900">
-                  Supplier
-                </label>
-                <div className="mt-2">
                   <input
                     type="text"
-                    id="supplier"
-                    {...register('supplier')}
-                    className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                    id="unit"
+                    {...register('unit')}
+                    className="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                    placeholder="e.g., piece, kg, box"
                   />
-                  {errors.supplier && (
-                    <p className="mt-2 text-sm text-red-600">{errors.supplier.message}</p>
+                  {errors.unit && (
+                    <p className="mt-2 text-sm text-red-600">{errors.unit.message}</p>
                   )}
                 </div>
               </div>
@@ -200,27 +195,10 @@ export default function AddProductPage() {
                     type="text"
                     id="barcode"
                     {...register('barcode')}
-                    className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                    className="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                   />
                   {errors.barcode && (
                     <p className="mt-2 text-sm text-red-600">{errors.barcode.message}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="col-span-full">
-                <label htmlFor="description" className="block text-sm font-medium leading-6 text-gray-900">
-                  Description (Optional)
-                </label>
-                <div className="mt-2">
-                  <textarea
-                    id="description"
-                    rows={3}
-                    {...register('description')}
-                    className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                  />
-                  {errors.description && (
-                    <p className="mt-2 text-sm text-red-600">{errors.description.message}</p>
                   )}
                 </div>
               </div>
@@ -246,9 +224,9 @@ export default function AddProductPage() {
                     <input
                       type="number"
                       id="buyingPrice"
-                      step="0.01"
+                      step="1"
                       {...register('buyingPrice')}
-                      className="block w-full rounded-md border-0 py-1.5 pl-7 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                      className="block w-full rounded-md border-0 py-1.5 pl-7 pr-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                     />
                   </div>
                   {errors.buyingPrice && (
@@ -269,9 +247,9 @@ export default function AddProductPage() {
                     <input
                       type="number"
                       id="sellingPrice"
-                      step="0.01"
+                      step="1"
                       {...register('sellingPrice')}
-                      className="block w-full rounded-md border-0 py-1.5 pl-7 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                      className="block w-full rounded-md border-0 py-1.5 pl-7 pr-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                     />
                   </div>
                   {errors.sellingPrice && (
@@ -292,9 +270,9 @@ export default function AddProductPage() {
                     <input
                       type="number"
                       id="wholesalePrice"
-                      step="0.01"
+                      step="1"
                       {...register('wholesalePrice')}
-                      className="block w-full rounded-md border-0 py-1.5 pl-7 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                      className="block w-full rounded-md border-0 py-1.5 pl-7 pr-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                     />
                   </div>
                   {errors.wholesalePrice && (
@@ -315,9 +293,9 @@ export default function AddProductPage() {
                     <input
                       type="number"
                       id="mrp"
-                      step="0.01"
+                      step="1"
                       {...register('mrp')}
-                      className="block w-full rounded-md border-0 py-1.5 pl-7 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                      className="block w-full rounded-md border-0 py-1.5 pl-7 pr-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                     />
                   </div>
                   {errors.mrp && (
@@ -336,9 +314,9 @@ export default function AddProductPage() {
                     id="discountPercentage"
                     min="0"
                     max="100"
-                    step="0.01"
+                    step="1"
                     {...register('discountPercentage')}
-                    className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                    className="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                   />
                   {errors.discountPercentage && (
                     <p className="mt-2 text-sm text-red-600">{errors.discountPercentage.message}</p>
@@ -355,9 +333,9 @@ export default function AddProductPage() {
                     type="number"
                     id="taxRate"
                     min="0"
-                    step="0.01"
+                    step="1"
                     {...register('taxRate')}
-                    className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                    className="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                   />
                   {errors.taxRate && (
                     <p className="mt-2 text-sm text-red-600">{errors.taxRate.message}</p>

@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     // Validate required fields
     const requiredFields = [
       'name', 'quantity', 'buyingPrice', 'sellingPrice', 'wholesalePrice',
-      'mrp', 'unit', 'category', 'supplier', 'taxRate'
+      'mrp', 'unit', 'category', 'taxRate'
     ];
     
     for (const field of requiredFields) {
@@ -106,9 +106,7 @@ export async function POST(request: NextRequest) {
         category: body.category,
         categoryId: body.categoryId || null,
         barcode: body.barcode,
-        supplier: body.supplier,
         taxRate: body.taxRate,
-        description: body.description,
         isActive: body.isActive !== undefined ? body.isActive : true,
       },
     });

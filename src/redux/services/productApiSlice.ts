@@ -25,7 +25,7 @@ export interface Product {
   categoryId?: string;
   productCategory?: ProductCategory;
   barcode?: string;
-  supplier: string;
+  supplier?: string;
   taxRate: number;
   description?: string;
   isActive: boolean;
@@ -45,7 +45,7 @@ export interface ProductCreateInput {
   category: string;
   categoryId?: string;
   barcode?: string;
-  supplier: string;
+  supplier?: string;
   taxRate: number;
   description?: string;
   isActive?: boolean;

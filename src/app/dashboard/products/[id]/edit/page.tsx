@@ -22,13 +22,11 @@ const productSchema = z.object({
   category: z.string().min(1, 'Category is required'),
   categoryId: z.string().optional(),
   barcode: z.string().optional(),
-  supplier: z.string().min(1, 'Supplier is required'),
   taxRate: z.coerce.number().min(0, 'Tax rate cannot be negative'),
-  description: z.string().optional(),
   isActive: z.boolean().default(true),
 });
 
-// Define the type for our form
+// Define the type for our form based on Zod schema
 type ProductFormData = z.infer<typeof productSchema>;
 
 export default function EditProductPage({ params }: { params: { id: string } }) {
@@ -57,7 +55,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
     reset,
     setValue,
   } = useForm<ProductFormData>({
-    resolver: zodResolver(productSchema),
+    resolver: zodResolver(productSchema) as any,
     defaultValues: {
       name: '',
       quantity: 0,
@@ -70,9 +68,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
       category: '',
       categoryId: '',
       barcode: '',
-      supplier: '',
       taxRate: 0,
-      description: '',
       isActive: true,
     },
   });
@@ -107,9 +103,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
           category: categoryName,
           categoryId: product.categoryId || '',
           barcode: product.barcode || '',
-          supplier: product.supplier,
           taxRate: product.taxRate,
-          description: product.description || '',
           isActive: product.isActive,
         });
       } else {
@@ -126,9 +120,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
           category: product.category,
           categoryId: product.categoryId || '',
           barcode: product.barcode || '',
-          supplier: product.supplier,
           taxRate: product.taxRate,
-          description: product.description || '',
           isActive: product.isActive,
         });
       }
@@ -267,23 +259,13 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
                         Unit *
                       </label>
                       <div className="mt-1">
-                        <select
+                        <input
+                          type="text"
                           id="unit"
                           {...register('unit')}
+                          placeholder="e.g., piece, kg, box"
                           className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                        >
-                          <option value="piece">Piece</option>
-                          <option value="kg">Kilogram (kg)</option>
-                          <option value="g">Gram (g)</option>
-                          <option value="l">Liter (l)</option>
-                          <option value="ml">Milliliter (ml)</option>
-                          <option value="box">Box</option>
-                          <option value="carton">Carton</option>
-                          <option value="dozen">Dozen</option>
-                          <option value="pack">Pack</option>
-                          <option value="pair">Pair</option>
-                          <option value="set">Set</option>
-                        </select>
+                        />
                         {errors.unit && (
                           <p className="mt-1 text-sm text-red-600">{errors.unit.message}</p>
                         )}
@@ -300,30 +282,13 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
                       <div className="mt-1">
                         <input
                           type="number"
-                          step="0.01"
+                          step="1"
                           id="quantity"
                           {...register('quantity')}
                           className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                         />
                         {errors.quantity && (
                           <p className="mt-1 text-sm text-red-600">{errors.quantity.message}</p>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <label htmlFor="supplier" className="block text-sm font-medium text-gray-700">
-                        Supplier *
-                      </label>
-                      <div className="mt-1">
-                        <input
-                          type="text"
-                          id="supplier"
-                          {...register('supplier')}
-                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                        />
-                        {errors.supplier && (
-                          <p className="mt-1 text-sm text-red-600">{errors.supplier.message}</p>
                         )}
                       </div>
                     </div>
@@ -380,7 +345,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
                         </div>
                         <input
                           type="number"
-                          step="0.01"
+                          step="1"
                           id="sellingPrice"
                           {...register('sellingPrice')}
                           className="block w-full rounded-md border-gray-300 pl-7 focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
@@ -403,7 +368,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
                         </div>
                         <input
                           type="number"
-                          step="0.01"
+                          step="1"
                           id="wholesalePrice"
                           {...register('wholesalePrice')}
                           className="block w-full rounded-md border-gray-300 pl-7 focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
@@ -424,7 +389,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
                         </div>
                         <input
                           type="number"
-                          step="0.01"
+                          step="1"
                           id="mrp"
                           {...register('mrp')}
                           className="block w-full rounded-md border-gray-300 pl-7 focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
@@ -444,7 +409,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
                       <div className="mt-1 relative rounded-md shadow-sm">
                         <input
                           type="number"
-                          step="0.01"
+                          step="1"
                           id="discountPercentage"
                           {...register('discountPercentage')}
                           className="block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
@@ -465,7 +430,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
                       <div className="mt-1 relative rounded-md shadow-sm">
                         <input
                           type="number"
-                          step="0.01"
+                          step="1"
                           id="taxRate"
                           {...register('taxRate')}
                           className="block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
@@ -477,24 +442,6 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
                           <p className="mt-1 text-sm text-red-600">{errors.taxRate.message}</p>
                         )}
                       </div>
-                    </div>
-                  </div>
-                  
-                  {/* Description */}
-                  <div>
-                    <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-                      Description (Optional)
-                    </label>
-                    <div className="mt-1">
-                      <textarea
-                        id="description"
-                        rows={3}
-                        {...register('description')}
-                        className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                      />
-                      {errors.description && (
-                        <p className="mt-1 text-sm text-red-600">{errors.description.message}</p>
-                      )}
                     </div>
                   </div>
                   

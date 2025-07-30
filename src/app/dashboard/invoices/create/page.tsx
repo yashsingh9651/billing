@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray, SubmitHandler } from 'react-hook-form';
 import { z } from 'zod';
@@ -15,10 +15,15 @@ import { formatCurrency, calculateAmount } from '@/lib/utils';
 const invoiceItemSchema = z.object({
   productId: z.string().min(1, 'Product is required'),
   productName: z.string().min(1, 'Product name is required'),
-  quantity: z.coerce.number().min(0.01, 'Quantity must be greater than 0'),
-  rate: z.coerce.number().min(0.01, 'Rate must be greater than 0'),
+  quantity: z.coerce.number().positive('Quantity must be greater than 0'),
+  rate: z.coerce.number().positive('Rate must be greater than 0'),
   discount: z.coerce.number().min(0, 'Discount cannot be negative').max(100, 'Discount cannot be more than 100%'),
   amount: z.coerce.number().min(0, 'Amount must be 0 or greater'),
+  // New fields for buying invoices
+  mrp: z.coerce.number().min(0, 'MRP cannot be negative').optional(),
+  sellingPrice: z.coerce.number().min(0, 'Selling price cannot be negative').optional(),
+  wholesalePrice: z.coerce.number().min(0, 'Wholesale price cannot be negative').optional(),
+  taxRate: z.coerce.number().min(0, 'Tax rate cannot be negative').max(100, 'Tax rate cannot exceed 100%').optional(),
 });
 
 const invoiceSchema = z.object({
@@ -60,6 +65,9 @@ const CreateInvoicePage = () => {
   const [subtotal, setSubtotal] = useState(0);
   const [taxTotal, setTaxTotal] = useState(0);
   const [total, setTotal] = useState(0);
+  
+  // Create firstRender ref at component level
+  const firstRender = useRef(true);
   
   // Get business details from user session
   const [businessDetails, setBusinessDetails] = useState({
@@ -113,10 +121,14 @@ const CreateInvoicePage = () => {
           rate: 0,
           discount: 0,
           amount: 0,
+          mrp: 0,
+          sellingPrice: 0,
+          wholesalePrice: 0,
+          taxRate: 0
         },
       ],
-      cgstRate: 9,
-      sgstRate: 9,
+      cgstRate: 0,
+      sgstRate: 0,
       igstRate: 0,
       notes: '',
     },
@@ -159,6 +171,25 @@ const CreateInvoicePage = () => {
     }
   }, [watchType, businessDetails, setValue]);
 
+  // Effect to recalculate whenever item quantity, rate, or discount changes
+  useEffect(() => {
+    // For each item in the items array, recalculate its amount
+    if (watchItems && watchItems.length > 0) {
+      watchItems.forEach((item, index) => {
+        const amount = calculateAmount(
+          Number(item.quantity) || 0,
+          Number(item.rate) || 0,
+          Number(item.discount) || 0
+        );
+        
+        // Only update if amount has changed to avoid infinite loop
+        if (item.amount !== amount) {
+          setValue(`items.${index}.amount`, amount);
+        }
+      });
+    }
+  }, [watchItems, setValue]);
+
   // Calculate amounts whenever items or tax rates change
   useEffect(() => {
     // Calculate subtotal
@@ -177,12 +208,41 @@ const CreateInvoicePage = () => {
     setTotal(newTotal);
   }, [watchItems, watchCgstRate, watchSgstRate, watchIgstRate]);
 
+  // Effect to recalculate item amounts when their quantities or rates change
+  useEffect(() => {
+    // Create firstRender ref outside of useEffect
+    if (!firstRender.current) {
+      // For each item in the items array, recalculate its amount
+      if (watchItems && watchItems.length > 0) {
+        watchItems.forEach((item, index) => {
+          if (item.quantity !== undefined && item.rate !== undefined) {
+            const amount = calculateAmount(
+              Number(item.quantity) || 0,
+              Number(item.rate) || 0,
+              Number(item.discount) || 0
+            );
+            
+            // Only update if amount has actually changed to avoid loops
+            if (Number(item.amount) !== amount) {
+              console.log(`Auto-updating amount for item ${index}:`, amount);
+              setValue(`items.${index}.amount`, amount);
+            }
+          }
+        });
+      }
+    } else {
+      firstRender.current = false;
+    }
+  }, [watchItems, setValue]);
+
   // Handle product selection change
   const handleProductChange = (index: number, productId: string) => {
     if (!productId || !productsData?.products) return;
     
     const product = productsData.products.find(p => p.id === productId);
     if (!product) return;
+    
+    console.log('Selected product:', product);
     
     // Get current values
     const currentQty = getValues(`items.${index}.quantity`) || 1;
@@ -191,24 +251,90 @@ const CreateInvoicePage = () => {
     
     // Update fields
     setValue(`items.${index}.productName`, product.name);
+    setValue(`items.${index}.quantity`, currentQty);
     setValue(`items.${index}.rate`, rate);
     setValue(`items.${index}.discount`, discount);
+    
+    // Set additional fields for product pricing
+    setValue(`items.${index}.mrp`, product.mrp);
+    setValue(`items.${index}.sellingPrice`, product.sellingPrice);
+    setValue(`items.${index}.wholesalePrice`, product.wholesalePrice);
+    setValue(`items.${index}.taxRate`, product.taxRate);
     
     // Calculate and set amount
     const amount = calculateAmount(currentQty, rate, discount);
     setValue(`items.${index}.amount`, amount);
+    
+    // Get the updated item
+    const updatedItem = getValues(`items.${index}`);
+    console.log('Updated product data:', updatedItem);
+    
+    // Manually trigger a recalculation of totals
+    const items = getValues('items');
+    const newSubtotal = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    setSubtotal(newSubtotal);
   };
 
   // Handle quantity or rate change
   const handleItemCalculation = (index: number) => {
-    const item = getValues(`items.${index}`);
-    const amount = calculateAmount(
-      Number(item.quantity) || 0, 
-      Number(item.rate) || 0, 
-      Number(item.discount) || 0
-    );
+    console.log('Recalculating item amount for index:', index);
     
+    // Get the latest values directly
+    const item = getValues(`items.${index}`);
+    const quantity = Number(item.quantity) || 0;
+    const rate = Number(item.rate) || 0;
+    const discount = Number(item.discount) || 0;
+    
+    console.log('Raw item values:', item);
+    console.log('Parsed values:', { quantity, rate, discount });
+    
+    // Calculate the new amount
+    const amount = calculateAmount(quantity, rate, discount);
+    console.log('Calculated amount:', amount);
+    
+    // Update the amount in the form
     setValue(`items.${index}.amount`, amount);
+    
+    // Update the entire item to ensure changes are reflected
+    const updatedItem = {
+      ...item,
+      amount: amount
+    };
+    setValue(`items.${index}`, updatedItem);
+    
+    // If this is a product that exists in the database, update the product info if it's a buying invoice
+    const productId = getValues(`items.${index}.productId`);
+    if (productId && watchType === 'BUYING') {
+      // These values will be used when the invoice is submitted to update the product in the database
+      const mrp = getValues(`items.${index}.mrp`);
+      const sellingPrice = getValues(`items.${index}.sellingPrice`);
+      const wholesalePrice = getValues(`items.${index}.wholesalePrice`);
+      const taxRate = getValues(`items.${index}.taxRate`);
+      
+      // Log the updated values for debugging
+      console.log(`Product ${productId} pricing updated:`, {
+        mrp, sellingPrice, wholesalePrice, taxRate
+      });
+    }
+    
+    // Manually trigger a recalculation of totals
+    const items = getValues('items');
+    const newSubtotal = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    setSubtotal(newSubtotal);
+    
+    // Recalculate tax amounts
+    const cgstRate = Number(getValues('cgstRate')) || 0;
+    const sgstRate = Number(getValues('sgstRate')) || 0;
+    const igstRate = Number(getValues('igstRate')) || 0;
+    
+    const cgstAmount = (newSubtotal * cgstRate) / 100;
+    const sgstAmount = (newSubtotal * sgstRate) / 100;
+    const igstAmount = (newSubtotal * igstRate) / 100;
+    const newTaxTotal = cgstAmount + sgstAmount + igstAmount;
+    setTaxTotal(newTaxTotal);
+    
+    // Update total
+    setTotal(newSubtotal + newTaxTotal);
   };
 
   // Add a new item row
@@ -220,6 +346,10 @@ const CreateInvoicePage = () => {
       rate: 0,
       discount: 0,
       amount: 0,
+      mrp: 0,
+      sellingPrice: 0,
+      wholesalePrice: 0,
+      taxRate: 0
     });
   };
 
@@ -241,6 +371,13 @@ const CreateInvoicePage = () => {
         items: data.items.map((item, idx) => ({
           ...item,
           serialNumber: idx + 1,
+          // Include the updated product pricing data for buying invoices
+          updateProductPricing: watchType === 'BUYING' && item.productId ? {
+            mrp: item.mrp,
+            sellingPrice: item.sellingPrice,
+            wholesalePrice: item.wholesalePrice,
+            taxRate: item.taxRate
+          } : undefined
         })),
         
         // Add flag to update inventory for both buying and selling invoices
@@ -288,7 +425,7 @@ const CreateInvoicePage = () => {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+      <form onSubmit={handleSubmit(onSubmit as any)} className="space-y-8">
         {/* Invoice type and date */}
         <div className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
           <div className="sm:col-span-3">
@@ -299,7 +436,7 @@ const CreateInvoicePage = () => {
               <select
                 id="type"
                 {...register('type')}
-                className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                className="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
               >
                 <option value="BUYING">Buying</option>
                 <option value="SELLING">Selling</option>
@@ -319,7 +456,7 @@ const CreateInvoicePage = () => {
                 type="date"
                 id="date"
                 {...register('date')}
-                className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                className="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
               />
               {errors.date && (
                 <p className="mt-2 text-sm text-red-600">{errors.date.message}</p>
@@ -528,6 +665,18 @@ const CreateInvoicePage = () => {
                       <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
                         Amount
                       </th>
+                      <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                        MRP
+                      </th>
+                      <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                        Selling Price
+                      </th>
+                      <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                        Wholesale Price
+                      </th>
+                      <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                        Tax Rate %
+                      </th>
                       <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-0">
                         <span className="sr-only">Actions</span>
                       </th>
@@ -538,9 +687,15 @@ const CreateInvoicePage = () => {
                       <tr key={field.id}>
                         <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-0">
                           <select
-                            {...register(`items.${index}.productId`)}
-                            onChange={(e) => handleProductChange(index, e.target.value)}
-                            className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                            value={getValues(`items.${index}.productId`) || ""}
+                            onChange={(e) => {
+                              // Update the productId field directly
+                              setValue(`items.${index}.productId`, e.target.value);
+                              handleProductChange(index, e.target.value);
+                              // Force update after selection
+                              setTimeout(() => handleItemCalculation(index), 100);
+                            }}
+                            className="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                           >
                             <option value="">Select a product</option>
                             {productsData?.products?.map((product) => (
@@ -549,6 +704,11 @@ const CreateInvoicePage = () => {
                               </option>
                             ))}
                           </select>
+                          {getValues(`items.${index}.productName`) && (
+                            <p className="mt-1 text-xs text-green-600">
+                              Selected: {getValues(`items.${index}.productName`)}
+                            </p>
+                          )}
                           {errors.items?.[index]?.productId && (
                             <p className="mt-2 text-sm text-red-600">{errors.items[index]?.productId?.message}</p>
                           )}
@@ -557,10 +717,14 @@ const CreateInvoicePage = () => {
                           <input
                             type="number"
                             {...register(`items.${index}.quantity`)}
-                            onChange={() => handleItemCalculation(index)}
-                            className="block w-24 rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                            min="0.01"
-                            step="0.01"
+                            onChange={(e) => {
+                              const value = parseInt(e.target.value);
+                              setValue(`items.${index}.quantity`, value);
+                              handleItemCalculation(index);
+                            }}
+                            className="block w-24 rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                            min="1"
+                            step="1"
                           />
                           {errors.items?.[index]?.quantity && (
                             <p className="mt-2 text-sm text-red-600">{errors.items[index]?.quantity?.message}</p>
@@ -570,10 +734,14 @@ const CreateInvoicePage = () => {
                           <input
                             type="number"
                             {...register(`items.${index}.rate`)}
-                            onChange={() => handleItemCalculation(index)}
-                            className="block w-24 rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                            min="0.01"
-                            step="0.01"
+                            onChange={(e) => {
+                              const value = parseInt(e.target.value);
+                              setValue(`items.${index}.rate`, value);
+                              handleItemCalculation(index);
+                            }}
+                            className="block w-24 rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                            min="0"
+                            step="1"
                           />
                           {errors.items?.[index]?.rate && (
                             <p className="mt-2 text-sm text-red-600">{errors.items[index]?.rate?.message}</p>
@@ -583,10 +751,15 @@ const CreateInvoicePage = () => {
                           <input
                             type="number"
                             {...register(`items.${index}.discount`)}
-                            onChange={() => handleItemCalculation(index)}
-                            className="block w-24 rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                            onChange={(e) => {
+                              const value = parseInt(e.target.value);
+                              setValue(`items.${index}.discount`, value);
+                              handleItemCalculation(index);
+                            }}
+                            className="block w-24 rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                             min="0"
                             max="100"
+                            step="1"
                           />
                           {errors.items?.[index]?.discount && (
                             <p className="mt-2 text-sm text-red-600">{errors.items[index]?.discount?.message}</p>
@@ -596,12 +769,62 @@ const CreateInvoicePage = () => {
                           <input
                             type="number"
                             {...register(`items.${index}.amount`)}
-                            className="block w-24 rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                             readOnly
+                            className="block w-24 rounded-md border-0 py-1.5 px-3 text-gray-900 bg-gray-100 shadow-sm placeholder:text-gray-400 focus:ring-0 sm:text-sm sm:leading-6 font-bold"
                           />
-                          {errors.items?.[index]?.amount && (
-                            <p className="mt-2 text-sm text-red-600">{errors.items[index]?.amount?.message}</p>
-                          )}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                          <input
+                            type="number"
+                            {...register(`items.${index}.mrp`)}
+                            onChange={(e) => {
+                              const value = parseInt(e.target.value);
+                              setValue(`items.${index}.mrp`, value);
+                            }}
+                            className="block w-24 rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                            min="0"
+                            step="1"
+                          />
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                          <input
+                            type="number"
+                            {...register(`items.${index}.sellingPrice`)}
+                            onChange={(e) => {
+                              const value = parseInt(e.target.value);
+                              setValue(`items.${index}.sellingPrice`, value);
+                            }}
+                            className="block w-24 rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                            min="0"
+                            step="1"
+                          />
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                          <input
+                            type="number"
+                            {...register(`items.${index}.wholesalePrice`)}
+                            onChange={(e) => {
+                              const value = parseInt(e.target.value);
+                              setValue(`items.${index}.wholesalePrice`, value);
+                            }}
+                            className="block w-24 rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                            min="0"
+                            step="1"
+                          />
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                          <input
+                            type="number"
+                            {...register(`items.${index}.taxRate`)}
+                            onChange={(e) => {
+                              const value = parseInt(e.target.value);
+                              setValue(`items.${index}.taxRate`, value);
+                            }}
+                            className="block w-24 rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                            min="0"
+                            max="100"
+                            step="1"
+                          />
                         </td>
                         <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-0">
                           {fields.length > 1 && (
@@ -617,6 +840,18 @@ const CreateInvoicePage = () => {
                         </td>
                       </tr>
                     ))}
+                    <tr>
+                      <td colSpan={10} className="px-3 py-4 text-center">
+                        <button
+                          type="button"
+                          onClick={addItem}
+                          className="inline-flex items-center rounded-md bg-indigo-100 px-3 py-2 text-sm font-semibold text-indigo-700 shadow-sm hover:bg-indigo-200"
+                        >
+                          <PlusIcon className="-ml-0.5 mr-1.5 h-4 w-4" aria-hidden="true" />
+                          Add Another Item
+                        </button>
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
                 
@@ -652,10 +887,10 @@ const CreateInvoicePage = () => {
                   type="number"
                   id="cgstRate"
                   {...register('cgstRate')}
-                  className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                  className="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                   min="0"
                   max="100"
-                  step="0.01"
+                  step="1"
                 />
                 {errors.cgstRate && (
                   <p className="mt-2 text-sm text-red-600">{errors.cgstRate.message}</p>
@@ -672,10 +907,10 @@ const CreateInvoicePage = () => {
                   type="number"
                   id="sgstRate"
                   {...register('sgstRate')}
-                  className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                  className="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                   min="0"
                   max="100"
-                  step="0.01"
+                  step="1"
                 />
                 {errors.sgstRate && (
                   <p className="mt-2 text-sm text-red-600">{errors.sgstRate.message}</p>
@@ -692,10 +927,10 @@ const CreateInvoicePage = () => {
                   type="number"
                   id="igstRate"
                   {...register('igstRate')}
-                  className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                  className="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                   min="0"
                   max="100"
-                  step="0.01"
+                  step="1"
                 />
                 {errors.igstRate && (
                   <p className="mt-2 text-sm text-red-600">{errors.igstRate.message}</p>
@@ -739,7 +974,7 @@ const CreateInvoicePage = () => {
               id="notes"
               {...register('notes')}
               rows={3}
-              className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+              className="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
               placeholder="Any additional notes for this invoice"
             />
           </div>
