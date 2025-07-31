@@ -13,6 +13,8 @@ export interface InvoiceItem {
   rate: number;
   discount: number;
   amount: number;
+  hsnCode?: string;
+  unit?: string;
 }
 
 export interface Invoice {
@@ -26,18 +28,38 @@ export interface Invoice {
   senderAddress: string;
   senderGST?: string;
   senderContact: string;
+  senderState?: string;
+  senderStateCode?: string;
+  senderEmail?: string;
   
   // Receiver info
   receiverName: string;
   receiverAddress: string;
   receiverGST?: string;
   receiverContact: string;
+  receiverState?: string;
+  
+  // Bank details
+  bankName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  authorisedSignatory?: string;
+  
+  // Invoice metadata
+  irn?: string;
+  ackNo?: string;
+  defaultHsnCode?: string;
+  
+  // Tax rates
+  cgstRate?: number;
+  sgstRate?: number;
   
   // Items and totals
   items: InvoiceItem[];
   subtotal: number;
   gstAmount: number;
-  sgstAmount: number;
+  cgst: number;
+  sgst: number;
   igstAmount: number;
   totalAmount: number;
   totalAmountInWords: string;

@@ -6,6 +6,13 @@ declare module 'next-auth' {
     businessAddress?: string;
     businessGST?: string;
     businessContact?: string;
+    businessStateCode?: string;
+    businessState?: string;
+    businessEmail?: string;
+    bankName?: string;
+    accountNumber?: string;
+    ifscCode?: string;
+    authorisedSignatory?: string;
   }
 
   interface Session {
@@ -14,6 +21,13 @@ declare module 'next-auth' {
       businessAddress?: string;
       businessGST?: string;
       businessContact?: string;
+      businessStateCode?: string;
+      businessState?: string;
+      businessEmail?: string;
+      bankName?: string;
+      accountNumber?: string;
+      ifscCode?: string;
+      authorisedSignatory?: string;
     } & Session['user'];
   }
 }

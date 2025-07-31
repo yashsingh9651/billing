@@ -1,510 +1,579 @@
-'use client';
-
-import { useState, useRef, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { 
-  ArrowLeftIcon, 
+"use client";
+import { useState, useRef } from "react";
+import { useRouter, useParams } from "next/navigation";
+import {
+  ArrowLeftIcon,
   DocumentArrowDownIcon,
-  PhoneIcon,
-  ShoppingCartIcon
-} from '@heroicons/react/24/outline';
-import Link from 'next/link';
-import { 
+} from "@heroicons/react/24/outline";
+import {
   useGetInvoiceByIdQuery,
-  useUpdateInventoryMutation
-} from '@/redux/services/invoiceApiSlice';
-import { formatCurrency } from '@/lib/utils';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
-import domtoimage from 'dom-to-image-more';
+  useUpdateInventoryMutation,
+} from "@/redux/services/invoiceApiSlice";
+import { formatCurrency } from "@/lib/utils";
+import jsPDF from "jspdf";
+import QRCode from "qrcode";
 
 // Function to format date
 const formatDate = (dateString: string): string => {
   const date = new Date(dateString);
-  return new Intl.DateTimeFormat('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   }).format(date);
 };
 
-// Helper function to convert hex color to RGB for PDF
-const hexToRgb = (hex: string): { r: number, g: number, b: number } => {
-  // Remove # if present
-  hex = hex.replace(/^#/, '');
-  
-  // Parse the hex value
-  const bigint = parseInt(hex, 16);
-  
-  // Extract RGB components
-  const r = (bigint >> 16) & 255;
-  const g = (bigint >> 8) & 255;
-  const b = bigint & 255;
-  
-  return { r, g, b };
-};
-
 // Status badge component
-const StatusBadge = ({ status }: { status: 'DRAFT' | 'FINALIZED' | 'PAID' | 'CANCELLED' }) => {
+const StatusBadge = ({
+  status,
+}: {
+  status: "DRAFT" | "FINALIZED" | "PAID" | "CANCELLED";
+}) => {
   const statusStyles = {
-    PAID: 'bg-green-100 text-green-800 border-green-200',
-    FINALIZED: 'bg-blue-100 text-blue-800 border-blue-200',
-    DRAFT: 'bg-gray-100 text-gray-800 border-gray-200',
-    CANCELLED: 'bg-red-100 text-red-800 border-red-200',
+    PAID: "bg-green-100 text-green-800 border-green-200",
+    FINALIZED: "bg-blue-100 text-blue-800 border-blue-200",
+    DRAFT: "bg-gray-100 text-gray-800 border-gray-200",
+    CANCELLED: "bg-red-100 text-red-800 border-red-200",
   };
 
   return (
-    <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium border ${statusStyles[status]}`}>
+    <span
+      className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium border ${statusStyles[status]}`}
+    >
       {status}
     </span>
   );
+};
+
+// Function to convert number to words (Indian format)
+const numberToWords = (num: number): string => {
+  const ones = [
+    "",
+    "One",
+    "Two",
+    "Three",
+    "Four",
+    "Five",
+    "Six",
+    "Seven",
+    "Eight",
+    "Nine",
+  ];
+  const teens = [
+    "Ten",
+    "Eleven",
+    "Twelve",
+    "Thirteen",
+    "Fourteen",
+    "Fifteen",
+    "Sixteen",
+    "Seventeen",
+    "Eighteen",
+    "Nineteen",
+  ];
+  const tens = [
+    "",
+    "",
+    "Twenty",
+    "Thirty",
+    "Forty",
+    "Fifty",
+    "Sixty",
+    "Seventy",
+    "Eighty",
+    "Ninety",
+  ];
+
+  if (num === 0) return "Zero";
+
+  const crores = Math.floor(num / 10000000);
+  const lakhs = Math.floor((num % 10000000) / 100000);
+  const thousands = Math.floor((num % 100000) / 1000);
+  const hundreds = Math.floor((num % 1000) / 100);
+  const remainder = num % 100;
+
+  let result = "";
+
+  if (crores > 0) result += convertHundreds(crores) + " Crore ";
+  if (lakhs > 0) result += convertHundreds(lakhs) + " Lakh ";
+  if (thousands > 0) result += convertHundreds(thousands) + " Thousand ";
+  if (hundreds > 0) result += ones[hundreds] + " Hundred ";
+
+  if (remainder > 0) {
+    if (remainder < 10) {
+      result += ones[remainder];
+    } else if (remainder < 20) {
+      result += teens[remainder - 10];
+    } else {
+      result += tens[Math.floor(remainder / 10)];
+      if (remainder % 10 > 0) {
+        result += " " + ones[remainder % 10];
+      }
+    }
+  }
+
+  return result.trim();
+
+  function convertHundreds(n: number): string {
+    let result = "";
+    const h = Math.floor(n / 100);
+    const remainder = n % 100;
+
+    if (h > 0) result += ones[h] + " Hundred ";
+
+    if (remainder > 0) {
+      if (remainder < 10) {
+        result += ones[remainder];
+      } else if (remainder < 20) {
+        result += teens[remainder - 10];
+      } else {
+        result += tens[Math.floor(remainder / 10)];
+        if (remainder % 10 > 0) {
+          result += " " + ones[remainder % 10];
+        }
+      }
+    }
+
+    return result.trim();
+  }
 };
 
 export default function InvoiceDetailsPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const [isPdfGenerating, setIsPdfGenerating] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
-  const [isUpdatingInventory, setIsUpdatingInventory] = useState(false);
   const invoiceRef = useRef<HTMLDivElement>(null);
-  
+
   const { data: invoice, isLoading, error } = useGetInvoiceByIdQuery(params.id);
-  const [updateInventory, { isLoading: isInventoryUpdateLoading }] = useUpdateInventoryMutation();
-  
-  // Debug function to log DOM structure
-  const logDOMInfo = (element: HTMLElement | null) => {
-    if (!element) {
-      console.log('Element is null');
-      return;
+  const [updateInventory] = useUpdateInventoryMutation();
+
+  // Generate QR Code
+  const generateQRCode = async (data: string): Promise<string> => {
+    try {
+      return await QRCode.toDataURL(data, {
+        width: 100,
+        margin: 1,
+        color: { dark: "#000000", light: "#FFFFFF" },
+      });
+    } catch (error) {
+      console.error("Error generating QR code:", error);
+      return "";
     }
-    
-    console.log('Element dimensions:', {
-      offsetWidth: element.offsetWidth,
-      offsetHeight: element.offsetHeight,
-      clientWidth: element.clientWidth, 
-      clientHeight: element.clientHeight,
-      scrollWidth: element.scrollWidth,
-      scrollHeight: element.scrollHeight
-    });
-    
-    console.log('Element computed style sample:', {
-      backgroundColor: window.getComputedStyle(element).backgroundColor,
-      color: window.getComputedStyle(element).color,
-      display: window.getComputedStyle(element).display,
-      position: window.getComputedStyle(element).position,
-    });
-    
-    console.log('Child elements count:', element.children.length);
-    console.log('First child element tag:', element.children[0]?.tagName);
   };
-  
-  // Add an effect to prepare the page for PDF generation when invoice data is loaded
-  useEffect(() => {
-    if (invoice && invoiceRef.current) {
-      // Ensure all images are loaded
-      const images = invoiceRef.current.querySelectorAll('img');
-      if (images.length > 0) {
-        console.log(`Found ${images.length} images, ensuring they load completely`);
-        images.forEach(img => {
-          if (!img.complete) {
-            img.onload = () => console.log(`Image loaded: ${img.src}`);
-            img.onerror = () => console.error(`Failed to load image: ${img.src}`);
-          }
-        });
-      }
-      
-      // Apply special styling for PDF generation
-      const styleEl = document.createElement('style');
-      styleEl.setAttribute('id', 'pdf-styles');
-      styleEl.textContent = `
-        @media print {
-          * {
-            -webkit-print-color-adjust: exact !important;
-            color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-        }
-      `;
-      document.head.appendChild(styleEl);
-      
-      return () => {
-        // Clean up styles when component unmounts
-        const pdfStyles = document.getElementById('pdf-styles');
-        if (pdfStyles) {
-          document.head.removeChild(pdfStyles);
-        }
-      };
-    }
-  }, [invoice]);
-  
-  // Handle download PDF
+
+  // Handle download PDF with Indian GST format
   const handleDownloadPdf = async () => {
     setIsPdfGenerating(true);
-    console.log('Creating structured PDF document directly with jsPDF');
 
     try {
-      if (!invoice) {
-        throw new Error('Invoice data not available');
+      if (!invoice) throw new Error("Invoice data not available");
+
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+      const pageWidth = 210;
+      const margin = 10;
+      const contentWidth = pageWidth - margin * 2;
+
+      // Generate QR Code
+      const qrData = `Invoice: ${invoice.invoiceNumber}, Date: ${invoice.date}, Amount: ${invoice.totalAmount}, GSTIN: ${invoice.senderGST}`;
+      const qrCodeDataUrl = await generateQRCode(qrData);
+
+      // Header - Tax Invoice
+      pdf.setFontSize(16);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Tax Invoice", margin, margin + 10);
+      pdf.setFontSize(10);
+      pdf.text("(ORIGINAL FOR RECIPIENT)", margin, margin + 16);
+
+      // e-Invoice label
+      pdf.text("e-Invoice", pageWidth - margin - 25, margin + 10);
+
+      // Add QR Code
+      if (qrCodeDataUrl) {
+        pdf.addImage(
+          qrCodeDataUrl,
+          "PNG",
+          pageWidth - margin - 25,
+          margin + 15,
+          20,
+          20
+        );
       }
 
-      // Create a new PDF document with professional formatting
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-      });
-      
-      // Set default font and sizes
-      pdf.setFont('helvetica');
-      
-      // Page constants
-      const pageWidth = 210; // A4 width in mm
-      const margin = 20;
-      const contentWidth = pageWidth - (margin * 2);
-      
-      // Add company logo placeholder (optional)
-      // pdf.addImage(logoDataUrl, 'PNG', margin, margin, 40, 15);
-      
-      // Add header - Invoice Title and Number
-      pdf.setFillColor(248, 250, 252); // Light gray background
-      pdf.rect(margin, margin, contentWidth, 15, 'F');
-      pdf.setFontSize(18);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(31, 41, 55); // Dark gray text
-      pdf.text(`INVOICE #${invoice.invoiceNumber}`, margin, margin + 10);
-      
-      // Add date and status
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(107, 114, 128); // Medium gray
-      
-      // Format the date
-      const dateText = `Date: ${formatDate(invoice.date)}`;
-      const statusText = `Status: ${invoice.status}`;
-      
-      // Add status with color
-      pdf.text(dateText, margin, margin + 25);
-      pdf.text(statusText, margin + 70, margin + 25);
-      
-      // Color status indicator box
-      const statusColors: Record<string, string[]> = {
-        'PAID': ['#dcfce7', '#166534'], // Light green fill, dark green text
-        'FINALIZED': ['#dbeafe', '#1e40af'], // Light blue fill, dark blue text
-        'DRAFT': ['#f3f4f6', '#1f2937'], // Light gray fill, dark gray text
-        'CANCELLED': ['#fee2e2', '#991b1b'], // Light red fill, dark red text
-      };
-      
-      const statusColor = statusColors[invoice.status] || ['#f3f4f6', '#1f2937'];
-      
-      // Add colored status indicator
-      const statusBoxX = margin + 60;
-      const statusBoxY = margin + 21;
-      pdf.setFillColor(hexToRgb(statusColor[0]).r, hexToRgb(statusColor[0]).g, hexToRgb(statusColor[0]).b);
-      pdf.roundedRect(statusBoxX, statusBoxY, 7, 7, 1, 1, 'F');
-      
-      // Separator line
-      pdf.setDrawColor(229, 231, 235); // Light gray
-      pdf.line(margin, margin + 30, margin + contentWidth, margin + 30);
-      
-      // From and To section headers
-      const fromToY = margin + 40;
-      
-      // From (Sender) section
-      pdf.setFontSize(12);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(31, 41, 55);
-      pdf.text('FROM', margin, fromToY);
-      
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(invoice.senderName, margin, fromToY + 8);
-      
-      pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(107, 114, 128);
-      
-      // Handle multiline addresses by splitting them
-      const senderAddressLines = invoice.senderAddress.split('\n');
-      senderAddressLines.forEach((line, index) => {
-        pdf.text(line, margin, fromToY + 15 + (index * 5));
-      });
-      
-      // Add sender GST and contact details
-      let senderDetailY = fromToY + 15 + (senderAddressLines.length * 5);
-      
-      if (invoice.senderGST) {
-        senderDetailY += 5;
-        pdf.text(`GSTIN: ${invoice.senderGST}`, margin, senderDetailY);
-      }
-      
-      senderDetailY += 5;
-      pdf.text(`Phone: ${invoice.senderContact}`, margin, senderDetailY);
-      
-      // To (Receiver) section - right side
-      const toX = margin + contentWidth / 2 + 10; // Half the content width + a little spacing
-      
-      pdf.setFontSize(12);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(31, 41, 55);
-      pdf.text('TO', toX, fromToY);
-      
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(invoice.receiverName, toX, fromToY + 8);
-      
-      pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(107, 114, 128);
-      
-      // Handle multiline addresses for receiver
-      const receiverAddressLines = invoice.receiverAddress.split('\n');
-      receiverAddressLines.forEach((line, index) => {
-        pdf.text(line, toX, fromToY + 15 + (index * 5));
-      });
-      
-      // Add receiver GST and contact details
-      let receiverDetailY = fromToY + 15 + (receiverAddressLines.length * 5);
-      
-      if (invoice.receiverGST) {
-        receiverDetailY += 5;
-        pdf.text(`GSTIN: ${invoice.receiverGST}`, toX, receiverDetailY);
-      }
-      
-      receiverDetailY += 5;
-      pdf.text(`Phone: ${invoice.receiverContact}`, toX, receiverDetailY);
-      
-      // Determine where to start the invoice items table
-      const maxDetailY = Math.max(senderDetailY, receiverDetailY);
-      const tableStartY = maxDetailY + 15;
-      
-      // Invoice Items header
-      pdf.setFontSize(12);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(31, 41, 55);
-      pdf.text('INVOICE ITEMS', margin, tableStartY);
-      
-      // Draw table headers
-      const tableHeaderY = tableStartY + 8;
-      pdf.setFillColor(248, 250, 252);
-      pdf.rect(margin, tableHeaderY, contentWidth, 8, 'F');
-      
-      pdf.setFontSize(9);
-      pdf.setTextColor(31, 41, 55);
-      
-      const colWidths = [
-        contentWidth * 0.40, // Item name (40%)
-        contentWidth * 0.15, // Quantity (15%)
-        contentWidth * 0.15, // Rate (15%)
-        contentWidth * 0.15, // Discount (15%)
-        contentWidth * 0.15, // Amount (15%)
-      ];
-      
-      const cols = [
-        { text: 'ITEM', x: margin },
-        { text: 'QTY', x: margin + colWidths[0], align: 'right' },
-        { text: 'RATE', x: margin + colWidths[0] + colWidths[1], align: 'right' },
-        { text: 'DISCOUNT', x: margin + colWidths[0] + colWidths[1] + colWidths[2], align: 'right' },
-        { text: 'AMOUNT', x: margin + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], align: 'right' }
-      ];
-      
-      cols.forEach(col => {
-        if (col.align === 'right') {
-          const textWidth = pdf.getTextWidth(col.text);
-          pdf.text(col.text, col.x + colWidths[cols.indexOf(col)] - textWidth, tableHeaderY + 5.5);
-        } else {
-          pdf.text(col.text, col.x, tableHeaderY + 5.5);
-        }
-      });
-      
-      // Table rows
-      pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(75, 85, 99);
-      let yPos = tableHeaderY + 12;
-      const rowHeight = 8;
-      
-      // Draw horizontal line below header
-      pdf.line(margin, tableHeaderY + 8, margin + contentWidth, tableHeaderY + 8);
-      
-      // Draw invoice items
-      invoice.items.forEach((item, index) => {
-        // Item name
-        pdf.text(item.productName, margin, yPos);
-        
-        // Quantity (right aligned)
-        const qtyText = item.quantity.toString();
-        const qtyWidth = pdf.getTextWidth(qtyText);
-        pdf.text(qtyText, margin + colWidths[0] + colWidths[1] - qtyWidth, yPos);
-        
-        // Rate (right aligned)
-        const rateText = formatCurrency(item.rate);
-        const rateWidth = pdf.getTextWidth(rateText);
-        pdf.text(rateText, margin + colWidths[0] + colWidths[1] + colWidths[2] - rateWidth, yPos);
-        
-        // Discount (right aligned)
-        const discountText = item.discount > 0 ? `${item.discount}%` : '-';
-        const discountWidth = pdf.getTextWidth(discountText);
-        pdf.text(discountText, margin + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] - discountWidth, yPos);
-        
-        // Amount (right aligned)
-        const amountText = formatCurrency(item.amount);
-        const amountWidth = pdf.getTextWidth(amountText);
-        pdf.text(amountText, margin + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + colWidths[4] - amountWidth, yPos);
-        
-        // Draw horizontal line
-        yPos += rowHeight;
-        pdf.line(margin, yPos - 3, margin + contentWidth, yPos - 3);
-      });
-      
-      // Summary section (subtotal, taxes, total)
-      const summaryX = margin + colWidths[0] + colWidths[1] + colWidths[2];
-      let summaryY = yPos + 5;
-      
-      // Subtotal
-      pdf.setFont('helvetica', 'normal');
-      pdf.text('Subtotal:', summaryX, summaryY);
-      const subtotalText = formatCurrency(invoice.subtotal);
-      const subtotalWidth = pdf.getTextWidth(subtotalText);
-      pdf.text(subtotalText, margin + contentWidth - subtotalWidth, summaryY);
-      
-      // GST
-      summaryY += 7;
-      pdf.text('GST:', summaryX, summaryY);
-      const gstText = formatCurrency(invoice.gstAmount);
-      const gstWidth = pdf.getTextWidth(gstText);
-      pdf.text(gstText, margin + contentWidth - gstWidth, summaryY);
-      
-      // SGST if applicable
-      if (invoice.sgstAmount > 0) {
-        summaryY += 7;
-        pdf.text('SGST:', summaryX, summaryY);
-        const sgstText = formatCurrency(invoice.sgstAmount);
-        const sgstWidth = pdf.getTextWidth(sgstText);
-        pdf.text(sgstText, margin + contentWidth - sgstWidth, summaryY);
-      }
-      
-      // IGST if applicable
-      if (invoice.igstAmount > 0) {
-        summaryY += 7;
-        pdf.text('IGST:', summaryX, summaryY);
-        const igstText = formatCurrency(invoice.igstAmount);
-        const igstWidth = pdf.getTextWidth(igstText);
-        pdf.text(igstText, margin + contentWidth - igstWidth, summaryY);
-      }
-      
-      // Total line
-      summaryY += 7;
-      pdf.line(summaryX, summaryY - 2, margin + contentWidth, summaryY - 2);
-      
-      // Total amount
-      summaryY += 5;
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(31, 41, 55);
-      pdf.text('TOTAL:', summaryX, summaryY);
-      const totalText = formatCurrency(invoice.totalAmount);
-      const totalWidth = pdf.getTextWidth(totalText);
-      pdf.text(totalText, margin + contentWidth - totalWidth, summaryY);
-      
-      // Amount in words
-      if (invoice.totalAmountInWords) {
-        summaryY += 10;
-        pdf.setFont('helvetica', 'italic');
-        pdf.setFontSize(9);
-        pdf.setTextColor(107, 114, 128);
-        pdf.text(`Amount in words: ${invoice.totalAmountInWords}`, margin, summaryY);
-      }
-      
-      // Notes section if present
-      if (invoice.notes) {
-        summaryY += 15;
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(10);
-        pdf.setTextColor(31, 41, 55);
-        pdf.text('NOTES', margin, summaryY);
-        
-        summaryY += 7;
-        pdf.setFont('helvetica', 'normal');
-        pdf.setTextColor(107, 114, 128);
-        
-        // Split notes into lines to fit within content width
-        const noteLines = pdf.splitTextToSize(invoice.notes, contentWidth);
-        noteLines.forEach((line: string, index: number) => {
-          pdf.text(line, margin, summaryY + (index * 5));
-        });
-      }
-      
-      // Footer with page number
-      const footerY = 287; // Near bottom of page
-      pdf.setFont('helvetica', 'normal');
+      let yPos = margin + 25;
+
+      // IRN and Invoice Details
       pdf.setFontSize(8);
-      pdf.setTextColor(156, 163, 175);
-      pdf.text(`Invoice #${invoice.invoiceNumber} - Generated on ${new Date().toLocaleDateString()}`, margin, footerY);
-      
-      // Save the PDF
-      pdf.save(`Invoice-${invoice.invoiceNumber || params.id}.pdf`);
-      console.log('Structured PDF generated successfully');
-      
+      pdf.setFont("helvetica", "normal");
+      pdf.text(`IRN: ${invoice.irn || "N/A"}`, margin, yPos);
+      pdf.text(`Invoice No: ${invoice.invoiceNumber}`, margin + 100, yPos);
+      yPos += 4;
+      pdf.text(`Ack No: ${invoice.ackNo || "N/A"}`, margin, yPos);
+      pdf.text(`Dated: ${formatDate(invoice.date)}`, margin + 100, yPos);
+      yPos += 4;
+      pdf.text(`Ack Date: ${formatDate(invoice.date)}`, margin, yPos);
+
+      yPos += 10;
+
+      // Company Details Section
+      pdf.setDrawColor(0, 0, 0);
+      pdf.rect(margin, yPos, contentWidth, 35);
+
+      pdf.setFontSize(12);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(invoice.senderName, margin + 2, yPos + 8);
+
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "normal");
+      const senderAddressLines = invoice.senderAddress.split("\n");
+      senderAddressLines.forEach((line, index) => {
+        pdf.text(line, margin + 2, yPos + 15 + index * 3);
+      });
+
+      pdf.text(
+        `GSTIN/UIN: ${invoice.senderGST || "N/A"}`,
+        margin + 2,
+        yPos + 28
+      );
+      pdf.text(
+        `State Name: ${invoice.senderState || "N/A"}, Code: 09`,
+        margin + 2,
+        yPos + 32
+      );
+      pdf.text(
+        `E-Mail: ${invoice.senderEmail || "N/A"}`,
+        margin + 100,
+        yPos + 28
+      );
+      pdf.text(`Contact: ${invoice.senderContact}`, margin + 100, yPos + 32);
+
+      yPos += 40;
+
+      // Consignee and Buyer Details
+      pdf.rect(margin, yPos, contentWidth / 2, 30);
+      pdf.rect(margin + contentWidth / 2, yPos, contentWidth / 2, 30);
+
+      // Consignee
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Consignee (Ship to)", margin + 2, yPos + 6);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(invoice.receiverName, margin + 2, yPos + 12);
+      const receiverAddressLines = invoice.receiverAddress.split("\n");
+      receiverAddressLines.forEach((line, index) => {
+        pdf.text(line, margin + 2, yPos + 16 + index * 3);
+      });
+      pdf.text(
+        `GSTIN/UIN: ${invoice.receiverGST || "N/A"}`,
+        margin + 2,
+        yPos + 26
+      );
+
+      // Buyer
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Buyer (Bill to)", margin + contentWidth / 2 + 2, yPos + 6);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(invoice.receiverName, margin + contentWidth / 2 + 2, yPos + 12);
+      receiverAddressLines.forEach((line, index) => {
+        pdf.text(line, margin + contentWidth / 2 + 2, yPos + 16 + index * 3);
+      });
+      pdf.text(
+        `GSTIN/UIN: ${invoice.receiverGST || "N/A"}`,
+        margin + contentWidth / 2 + 2,
+        yPos + 26
+      );
+
+      yPos += 35;
+
+      // Items Table
+      const tableHeaders = [
+        "Sl",
+        "Description of Goods",
+        "HSN/SAC",
+        "Quantity",
+        "Rate",
+        "Per",
+        "Disc %",
+        "Amount",
+      ];
+      const colWidths = [15, 60, 25, 20, 20, 15, 15, 30];
+
+      // Table header
+      pdf.setFillColor(240, 240, 240);
+      pdf.rect(margin, yPos, contentWidth, 10, "F");
+
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "bold");
+      let xPos = margin;
+      tableHeaders.forEach((header, index) => {
+        pdf.text(header, xPos + 1, yPos + 7);
+        pdf.line(xPos, yPos, xPos, yPos + 10);
+        xPos += colWidths[index];
+      });
+      pdf.line(xPos, yPos, xPos, yPos + 10);
+      pdf.line(margin, yPos + 10, margin + contentWidth, yPos + 10);
+
+      yPos += 10;
+
+      // Table rows
+      pdf.setFont("helvetica", "normal");
+      invoice.items.forEach((item, index) => {
+        const rowHeight = 8;
+        xPos = margin;
+
+        // Draw row data
+        pdf.text((index + 1).toString(), xPos + 1, yPos + 5);
+        xPos += colWidths[0];
+
+        pdf.text(item.productName, xPos + 1, yPos + 5);
+        xPos += colWidths[1];
+
+        pdf.text(item.hsnCode || "69101000", xPos + 1, yPos + 5);
+        xPos += colWidths[2];
+
+        pdf.text(`${item.quantity} PCS`, xPos + 1, yPos + 5);
+        xPos += colWidths[3];
+
+        pdf.text(item.rate.toFixed(2), xPos + 1, yPos + 5);
+        xPos += colWidths[4];
+
+        pdf.text("PCS", xPos + 1, yPos + 5);
+        xPos += colWidths[5];
+
+        pdf.text(`${item.discount}%`, xPos + 1, yPos + 5);
+        xPos += colWidths[6];
+
+        pdf.text(formatCurrency(item.amount), xPos + 1, yPos + 5);
+
+        // Draw borders
+        xPos = margin;
+        colWidths.forEach((width) => {
+          pdf.line(xPos, yPos, xPos, yPos + rowHeight);
+          xPos += width;
+        });
+        pdf.line(xPos, yPos, xPos, yPos + rowHeight);
+        pdf.line(
+          margin,
+          yPos + rowHeight,
+          margin + contentWidth,
+          yPos + rowHeight
+        );
+
+        yPos += rowHeight;
+      });
+
+      // Tax calculations
+      const cgstAmount = invoice.gstAmount / 2;
+      const sgstAmount = invoice.gstAmount / 2;
+
+      // CGST row
+      xPos = margin;
+      for (let i = 0; i < 6; i++) xPos += colWidths[i];
+      pdf.text("Output CGST 9%", margin + 2, yPos + 5);
+      pdf.text("9%", xPos + 1, yPos + 5);
+      xPos += colWidths[6];
+      pdf.text(formatCurrency(cgstAmount), xPos + 1, yPos + 5);
+
+      // Draw borders for CGST row
+      xPos = margin;
+      colWidths.forEach((width) => {
+        pdf.line(xPos, yPos, xPos, yPos + 8);
+        xPos += width;
+      });
+      pdf.line(xPos, yPos, xPos, yPos + 8);
+      pdf.line(margin, yPos + 8, margin + contentWidth, yPos + 8);
+      yPos += 8;
+
+      // SGST row
+      xPos = margin;
+      for (let i = 0; i < 6; i++) xPos += colWidths[i];
+      pdf.text("Output SGST 9%", margin + 2, yPos + 5);
+      pdf.text("9%", xPos + 1, yPos + 5);
+      xPos += colWidths[6];
+      pdf.text(formatCurrency(sgstAmount), xPos + 1, yPos + 5);
+
+      // Draw borders for SGST row
+      xPos = margin;
+      colWidths.forEach((width) => {
+        pdf.line(xPos, yPos, xPos, yPos + 8);
+        xPos += width;
+      });
+      pdf.line(xPos, yPos, xPos, yPos + 8);
+      pdf.line(margin, yPos + 8, margin + contentWidth, yPos + 8);
+      yPos += 8;
+
+      // Round off row
+      pdf.text("ROUND OFF", margin + 2, yPos + 5);
+      xPos = margin;
+      for (let i = 0; i < 7; i++) xPos += colWidths[i];
+      pdf.text("0.40", xPos + 1, yPos + 5);
+
+      // Draw borders for round off row
+      xPos = margin;
+      colWidths.forEach((width) => {
+        pdf.line(xPos, yPos, xPos, yPos + 8);
+        xPos += width;
+      });
+      pdf.line(xPos, yPos, xPos, yPos + 8);
+      pdf.line(margin, yPos + 8, margin + contentWidth, yPos + 8);
+      yPos += 8;
+
+      // Total row
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Total", margin + 2, yPos + 5);
+      xPos = margin;
+      for (let i = 0; i < 7; i++) xPos += colWidths[i];
+      pdf.text(`Rs ${formatCurrency(invoice.totalAmount)}`, xPos + 1, yPos + 5);
+
+      // Draw borders for total row
+      xPos = margin;
+      colWidths.forEach((width) => {
+        pdf.line(xPos, yPos, xPos, yPos + 8);
+        xPos += width;
+      });
+      pdf.line(xPos, yPos, xPos, yPos + 8);
+      pdf.line(margin, yPos + 8, margin + contentWidth, yPos + 8);
+
+      yPos += 15;
+
+      // Amount in words
+      pdf.setFont("helvetica", "normal");
+      const amountInWords =
+        invoice.totalAmountInWords ||
+        `${numberToWords(Math.floor(invoice.totalAmount))} Rupees Only`;
+      pdf.text(`Amount Chargeable (in words): ${amountInWords}`, margin, yPos);
+
+      yPos += 10;
+
+      // Tax breakdown table
+      pdf.setFontSize(7);
+      const taxTableHeaders = [
+        "HSN/SAC",
+        "Taxable Value",
+        "Central Tax Rate",
+        "Amount",
+        "State Tax Rate",
+        "Amount",
+        "Total Tax Amount",
+      ];
+      const taxColWidths = [25, 30, 25, 25, 25, 25, 35];
+
+      // Tax table header
+      pdf.setFillColor(240, 240, 240);
+      pdf.rect(margin, yPos, contentWidth, 8, "F");
+
+      xPos = margin;
+      taxTableHeaders.forEach((header, index) => {
+        pdf.text(header, xPos + 1, yPos + 5);
+        pdf.line(xPos, yPos, xPos, yPos + 8);
+        xPos += taxColWidths[index];
+      });
+      pdf.line(xPos, yPos, xPos, yPos + 8);
+      pdf.line(margin, yPos + 8, margin + contentWidth, yPos + 8);
+
+      yPos += 8;
+
+      // Tax table data row
+      xPos = margin;
+      pdf.text("69101000", xPos + 1, yPos + 5);
+      xPos += taxColWidths[0];
+      pdf.text(formatCurrency(invoice.subtotal), xPos + 1, yPos + 5);
+      xPos += taxColWidths[1];
+      pdf.text("9%", xPos + 1, yPos + 5);
+      xPos += taxColWidths[2];
+      pdf.text(formatCurrency(cgstAmount), xPos + 1, yPos + 5);
+      xPos += taxColWidths[3];
+      pdf.text("9%", xPos + 1, yPos + 5);
+      xPos += taxColWidths[4];
+      pdf.text(formatCurrency(sgstAmount), xPos + 1, yPos + 5);
+      xPos += taxColWidths[5];
+      pdf.text(formatCurrency(invoice.gstAmount), xPos + 1, yPos + 5);
+
+      // Draw borders for tax data row
+      xPos = margin;
+      taxColWidths.forEach((width) => {
+        pdf.line(xPos, yPos, xPos, yPos + 8);
+        xPos += width;
+      });
+      pdf.line(xPos, yPos, xPos, yPos + 8);
+      pdf.line(margin, yPos + 8, margin + contentWidth, yPos + 8);
+
+      yPos += 8;
+
+      // Tax total row
+      pdf.setFont("helvetica", "bold");
+      xPos = margin;
+      pdf.text("Total", xPos + 1, yPos + 5);
+      xPos += taxColWidths[0];
+      pdf.text(formatCurrency(invoice.subtotal), xPos + 1, yPos + 5);
+      xPos += taxColWidths[1] + taxColWidths[2];
+      pdf.text(formatCurrency(cgstAmount), xPos + 1, yPos + 5);
+      xPos += taxColWidths[3] + taxColWidths[4];
+      pdf.text(formatCurrency(sgstAmount), xPos + 1, yPos + 5);
+      xPos += taxColWidths[5];
+      pdf.text(formatCurrency(invoice.gstAmount), xPos + 1, yPos + 5);
+
+      // Draw borders for tax total row
+      xPos = margin;
+      taxColWidths.forEach((width) => {
+        pdf.line(xPos, yPos, xPos, yPos + 8);
+        xPos += width;
+      });
+      pdf.line(xPos, yPos, xPos, yPos + 8);
+      pdf.line(margin, yPos + 8, margin + contentWidth, yPos + 8);
+
+      yPos += 15;
+
+      // Tax amount in words
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(8);
+      const taxAmountInWords = `${numberToWords(
+        Math.floor(invoice.gstAmount)
+      )} Rupees Only`;
+      pdf.text(`Tax Amount (in words): ${taxAmountInWords}`, margin, yPos);
+
+      yPos += 10;
+
+      // Company's PAN and Declaration
+      pdf.text("Company's PAN: AAACR1234C", margin, yPos);
+
+      yPos += 8;
+      pdf.text("Declaration:", margin, yPos);
+      pdf.text(
+        "We declare that this invoice shows the actual price",
+        margin,
+        yPos + 4
+      );
+      pdf.text(
+        "of the goods described and that all particulars are",
+        margin,
+        yPos + 8
+      );
+      pdf.text("true and correct.", margin, yPos + 12);
+
+      // Signature section
+      pdf.text(`for ${invoice.senderName}`, margin + 120, yPos);
+      pdf.text("Authorised Signatory", margin + 120, yPos + 20);
+
+      // Footer
+      pdf.setFontSize(7);
+      pdf.text("This is a Computer Generated Invoice", margin, 280);
+
+      pdf.save(`Tax-Invoice-${invoice.invoiceNumber || params.id}.pdf`);
     } catch (error) {
-      console.error('Error generating structured PDF:', error);
-      alert(`Failed to generate PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error("Error generating PDF:", error);
+      alert(
+        `Failed to generate PDF: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     } finally {
       setIsPdfGenerating(false);
     }
   };
 
-  // Handle WhatsApp share
-  const handleWhatsAppShare = async () => {
-    setIsSharing(true);
-    
-    try {
-      // Create a WhatsApp shareable message
-      const message = `Invoice #${invoice?.invoiceNumber || params.id} from ${invoice?.senderName} for ${formatCurrency(invoice?.totalAmount || 0)}. Please check your email for details.`;
-      const encodedMessage = encodeURIComponent(message);
-      const whatsappURL = `https://wa.me/?text=${encodedMessage}`;
-      
-      // Open WhatsApp in a new tab
-      window.open(whatsappURL, '_blank');
-    } catch (error) {
-      console.error('Error sharing via WhatsApp:', error);
-      alert('Failed to share via WhatsApp. Please try again later.');
-    } finally {
-      setIsSharing(false);
-    }
-  };
-  
-  // Handle inventory update
-  const handleUpdateInventory = async () => {
-    if (!invoice) {
-      alert('Invoice data not available');
-      return;
-    }
-    
-    // Create the appropriate message based on invoice type
-    const confirmMessage = invoice.type === 'BUYING'
-      ? 'This will INCREASE inventory quantities for all products in this invoice. Continue?'
-      : 'This will DECREASE inventory quantities for all products in this invoice. This cannot be undone. Continue?';
-    
-    // Confirm with the user
-    if (!confirm(confirmMessage)) {
-      return;
-    }
-    
-    setIsUpdatingInventory(true);
-    
-    try {
-      const result = await updateInventory(params.id).unwrap();
-      
-      if (result.success) {
-        const actionText = invoice.type === 'BUYING' ? 'increased' : 'decreased';
-        alert(`Inventory updated successfully! ${result.results?.length || 0} products ${actionText}.`);
-      } else {
-        alert(`Failed to update inventory: ${result.message}`);
-      }
-    } catch (error) {
-      console.error('Error updating inventory:', error);
-      alert('Failed to update inventory. Please try again later.');
-    } finally {
-      setIsUpdatingInventory(false);
-    }
-  };
-  
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -512,14 +581,14 @@ export default function InvoiceDetailsPage() {
       </div>
     );
   }
-  
+
   if (error || !invoice) {
     return (
       <div className="flex flex-col justify-center items-center h-64">
         <div className="text-red-500 mb-4">Failed to load invoice details.</div>
         <button
           onClick={() => router.back()}
-          className="rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          className="rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
         >
           Go Back
         </button>
@@ -528,290 +597,369 @@ export default function InvoiceDetailsPage() {
   }
 
   return (
-    <div>
-      {/* Header */}
-      <div className="sm:flex sm:items-center sm:justify-between mb-8">
-        <div className="flex items-center">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="mr-4 rounded-md bg-white p-2 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-          >
-            <ArrowLeftIcon className="h-5 w-5" aria-hidden="true" />
-            <span className="sr-only">Back</span>
-          </button>
-          <div>
-            <h1 className="text-2xl font-semibold leading-7 text-gray-900">
-              Invoice #{invoice.invoiceNumber}
-            </h1>
-            <p className="mt-1 text-sm leading-6 text-gray-600">
-              {formatDate(invoice.date)} • <StatusBadge status={invoice.status} />
-            </p>
-          </div>
-        </div>
-        
-        <div className="mt-4 flex gap-3 sm:mt-0">
-          <button
-            type="button"
-            onClick={handleDownloadPdf}
-            disabled={isPdfGenerating}
-            className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-          >
-            <DocumentArrowDownIcon className="-ml-0.5 mr-1.5 h-5 w-5 text-gray-400" aria-hidden="true" />
-            {isPdfGenerating ? 'Generating...' : 'Download PDF'}
-          </button>
-          
-          <button
-            type="button"
-            onClick={handleWhatsAppShare}
-            disabled={isSharing}
-            className="inline-flex items-center rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600"
-          >
-            <PhoneIcon className="-ml-0.5 mr-1.5 h-5 w-5" aria-hidden="true" />
-            {isSharing ? 'Sharing...' : 'Share via WhatsApp'}
-          </button>
-          
-          {/* Show Update Inventory button for both buying and selling invoices */}
-          <button
-            type="button"
-            onClick={handleUpdateInventory}
-            disabled={isUpdatingInventory || isInventoryUpdateLoading}
-            className={`inline-flex items-center rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 ${
-              invoice.type === 'BUYING' 
-                ? 'bg-orange-600 hover:bg-orange-500 focus-visible:outline-orange-600' 
-                : 'bg-blue-600 hover:bg-blue-500 focus-visible:outline-blue-600'
-            }`}
-            title={invoice.type === 'BUYING' ? 'Increase inventory quantities' : 'Decrease inventory quantities'}
-          >
-            <ShoppingCartIcon className="-ml-0.5 mr-1.5 h-5 w-5" aria-hidden="true" />
-            {isUpdatingInventory ? 'Updating...' : invoice.type === 'BUYING' ? 'Stock In' : 'Stock Out'}
-          </button>
-          
-          <Link
-            href={`/dashboard/invoices/${params.id}/edit`}
-            className="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-          >
-            Edit Invoice
-          </Link>
-        </div>
-      </div>
-      
-      {/* Invoice Content */}
-      <div ref={invoiceRef} className="overflow-hidden bg-white shadow sm:rounded-lg" data-pdf-container>
-        <div className="border-b border-gray-200 bg-white px-4 py-5 sm:px-6">
-          <div className="grid grid-cols-1 gap-x-8 gap-y-8 md:grid-cols-2">
-            {/* Invoice Information */}
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-base font-semibold leading-6 text-gray-900">Invoice Information</h3>
-                <dl className="mt-2 divide-y divide-gray-100">
-                  <div className="grid grid-cols-2 gap-4 py-3 text-sm">
-                    <dt className="text-gray-500">Invoice Number</dt>
-                    <dd className="text-gray-900">{invoice.invoiceNumber}</dd>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 py-3 text-sm">
-                    <dt className="text-gray-500">Date</dt>
-                    <dd className="text-gray-900">{formatDate(invoice.date)}</dd>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 py-3 text-sm">
-                    <dt className="text-gray-500">Status</dt>
-                    <dd className="text-gray-900">
-                      <StatusBadge status={invoice.status} />
-                    </dd>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 py-3 text-sm">
-                    <dt className="text-gray-500">Type</dt>
-                    <dd className="text-gray-900">
-                      <span className={invoice.type === 'SELLING' ? 'text-indigo-600' : 'text-orange-600'}>
-                        {invoice.type === 'SELLING' ? 'Selling' : 'Buying'}
-                      </span>
-                    </dd>
-                  </div>
-                </dl>
-              </div>
-              
-              {/* From (Sender) */}
-              <div>
-                <h3 className="text-base font-semibold leading-6 text-gray-900">From</h3>
-                <dl className="mt-2 space-y-2 text-sm text-gray-900">
-                  <div>
-                    <dt className="sr-only">Name</dt>
-                    <dd className="font-medium">{invoice.senderName}</dd>
-                  </div>
-                  <div>
-                    <dt className="sr-only">Address</dt>
-                    <dd className="whitespace-pre-line">{invoice.senderAddress}</dd>
-                  </div>
-                  {invoice.senderGST && (
-                    <div>
-                      <dt className="sr-only">GST</dt>
-                      <dd>GSTIN: {invoice.senderGST}</dd>
-                    </div>
-                  )}
-                  <div>
-                    <dt className="sr-only">Contact</dt>
-                    <dd>Phone: {invoice.senderContact}</dd>
-                  </div>
-                </dl>
-              </div>
-            </div>
-            
-            {/* To (Receiver) */}
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="sm:flex sm:items-center sm:justify-between mb-8">
+          <div className="flex items-center">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="mr-4 rounded-md bg-white p-2 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <ArrowLeftIcon className="h-5 w-5" aria-hidden="true" />
+            </button>
             <div>
-              <h3 className="text-base font-semibold leading-6 text-gray-900">To</h3>
-              <dl className="mt-2 space-y-2 text-sm text-gray-900">
-                <div>
-                  <dt className="sr-only">Name</dt>
-                  <dd className="font-medium">{invoice.receiverName}</dd>
-                </div>
-                <div>
-                  <dt className="sr-only">Address</dt>
-                  <dd className="whitespace-pre-line">{invoice.receiverAddress}</dd>
-                </div>
-                {invoice.receiverGST && (
-                  <div>
-                    <dt className="sr-only">GST</dt>
-                    <dd>GSTIN: {invoice.receiverGST}</dd>
-                  </div>
-                )}
-                <div>
-                  <dt className="sr-only">Contact</dt>
-                  <dd>Phone: {invoice.receiverContact}</dd>
-                </div>
-              </dl>
+              <h1 className="text-2xl font-semibold leading-7 text-gray-900">
+                Tax Invoice #{invoice.invoiceNumber}
+              </h1>
+              <p className="mt-1 text-sm leading-6 text-gray-600">
+                {formatDate(invoice.date)} •{" "}
+                <StatusBadge status={invoice.status} />
+              </p>
             </div>
           </div>
+          <div className="mt-4 flex gap-3 sm:mt-0">
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={isPdfGenerating}
+              className="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50"
+            >
+              <DocumentArrowDownIcon
+                className="-ml-0.5 mr-1.5 h-5 w-5"
+                aria-hidden="true"
+              />
+              {isPdfGenerating ? "Generating..." : "Download Tax Invoice PDF"}
+            </button>
+          </div>
         </div>
-        
-        {/* Line Items */}
-        <div className="border-b border-gray-200 px-4 py-5 sm:px-6">
-          <h3 className="text-base font-semibold leading-6 text-gray-900 mb-4">Invoice Items</h3>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-300">
-              <thead>
-                <tr>
-                  <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-0">
-                    Item
+
+        {/* Invoice Content - Traditional Indian GST Format */}
+        <div
+          ref={invoiceRef}
+          className="bg-white shadow-lg rounded-lg overflow-hidden"
+        >
+          {/* Header Section */}
+          <div className="flex border-b-2 border-gray-900 bg-white px-6 py-4 justify-between items-start">
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">Tax Invoice</h1>
+              <p className="text-sm text-gray-600">(ORIGINAL FOR RECIPIENT)</p>
+            </div>
+            <div className="text-right">
+              <div className="text-sm font-semibold mb-2">e-Invoice</div>
+              <div className="w-20 h-20 bg-gray-200 border border-gray-400 flex items-center justify-center">
+                <span className="text-xs text-gray-500">QR Code</span>
+              </div>
+            </div>
+          </div>
+
+          {/* IRN and Invoice Details */}
+          <div className="flex justify-between items-center text-sm  border-b border-gray-400 px-6 py-3 bg-gray-50">
+            <div>
+              <strong>Invoice No. - </strong> {invoice.invoiceNumber}
+            </div>
+            <div>
+              <strong>Dated:</strong> {formatDate(invoice.date)}
+            </div>
+          </div>
+
+          {/* Consignee and Buyer Details */}
+          <div className="border-b border-gray-400">
+            <div className="grid grid-cols-2">
+              {/* Company Details */}
+              <div className="px-4 py-4 border-r">
+                <h3 className="font-bold text-sm mb-2">Seller (Bill From)</h3>
+                <div className="text-sm text-gray-700">
+                  <p className="font-medium">{invoice.senderName}</p>
+                  <p className="whitespace-pre-line mb-2">
+                    {invoice.senderAddress}
+                  </p>
+                  <p>
+                    <strong>GSTIN/UIN:</strong> {invoice.senderGST || "N/A"}
+                  </p>
+                  <p>
+                    <strong>State Name:</strong>{" "}
+                    {invoice.senderState || "N/A"}
+                  </p>
+                  <p>
+                    <strong>Contact:</strong>{" "}
+                    {invoice.senderContact || "N/A"}
+                  </p>
+                </div>
+              </div>
+              {/* Reciever Details */}
+              <div className="px-4 py-4">
+                <h3 className="font-bold text-sm mb-2">Buyer (Bill to)</h3>
+                <div className="text-sm text-gray-700">
+                  <p className="font-medium">{invoice.receiverName}</p>
+                  <p className="whitespace-pre-line mb-2">
+                    {invoice.receiverAddress}
+                  </p>
+                  <p>
+                    <strong>GSTIN/UIN:</strong> {invoice.receiverGST || "N/A"}
+                  </p>
+                  <p>
+                    <strong>State Name:</strong>{" "}
+                    {invoice.receiverState || "N/A"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Items Table */}
+          <div className="border-b border-gray-400">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr className="border-b border-gray-400">
+                  <th className="border-r border-gray-400 pl-4 px-2 py-2 text-left font-medium text-gray-900">
+                    Sl
                   </th>
-                  <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-gray-900">
+                  <th className="border-r border-gray-400 px-2 py-2 text-left font-medium text-gray-900">
+                    Description of Goods
+                  </th>
+                  <th className="border-r border-gray-400 px-2 py-2 text-center font-medium text-gray-900">
+                    HSN/SAC
+                  </th>
+                  <th className="border-r border-gray-400 px-2 py-2 text-center font-medium text-gray-900">
                     Quantity
                   </th>
-                  <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-gray-900">
+                  <th className="border-r border-gray-400 px-2 py-2 text-center font-medium text-gray-900">
                     Rate
                   </th>
-                  <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-gray-900">
-                    Discount
+                  <th className="border-r border-gray-400 px-2 py-2 text-center font-medium text-gray-900">
+                    Per
                   </th>
-                  <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-gray-900">
+                  <th className="border-r border-gray-400 px-2 py-2 text-center font-medium text-gray-900">
+                    Disc %
+                  </th>
+                  <th className="pr-4 px-2 py-2 text-right font-medium text-gray-900">
                     Amount
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
-                {invoice.items.map((item) => (
-                  <tr key={item.id || item.serialNumber}>
-                    <td className="py-4 pl-4 pr-3 text-sm sm:pl-0">
-                      <div className="font-medium text-gray-900">{item.productName}</div>
+              <tbody>
+                {invoice.items.map((item, index) => (
+                  <tr
+                    key={item.id || item.serialNumber}
+                    className="border-b border-gray-300"
+                  >
+                    <td className="border-r border-gray-300 pl-4 px-2 py-2">
+                      {index + 1}
                     </td>
-                    <td className="px-3 py-4 text-sm text-gray-500 text-right">{item.quantity}</td>
-                    <td className="px-3 py-4 text-sm text-gray-500 text-right">
-                      {formatCurrency(item.rate)}
+                    <td className="border-r border-gray-300 px-2 py-2">
+                      {item.productName}
                     </td>
-                    <td className="px-3 py-4 text-sm text-gray-500 text-right">
-                      {item.discount > 0 ? `${item.discount}%` : '-'}
+                    <td className="border-r border-gray-300 px-2 py-2 text-center">
+                      {item.hsnCode || "69101000"}
                     </td>
-                    <td className="px-3 py-4 text-sm text-gray-500 text-right">
+                    <td className="border-r border-gray-300 px-2 py-2 text-center">
+                      {item.quantity} PCS
+                    </td>
+                    <td className="border-r border-gray-300 px-2 py-2 text-center">
+                      {item.rate.toFixed(2)}
+                    </td>
+                    <td className="border-r border-gray-300 px-2 py-2 text-center">
+                      PCS
+                    </td>
+                    <td className="border-r border-gray-300 px-2 py-2 text-center">
+                      {item.discount}%
+                    </td>
+                    <td className="px-2 py-2 pr-4 text-right">
                       {formatCurrency(item.amount)}
                     </td>
                   </tr>
                 ))}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <th
-                    scope="row"
-                    colSpan={4}
-                    className="hidden pt-6 pl-4 pr-3 text-right text-sm font-normal text-gray-500 sm:table-cell sm:pl-0"
-                  >
-                    Subtotal
-                  </th>
-                  <td className="pt-6 pl-3 pr-4 text-right text-sm text-gray-900 sm:pr-0">
-                    {formatCurrency(invoice.subtotal)}
+
+                {/* Tax Summary Rows */}
+                <tr className="border-b border-gray-300">
+                  <td colSpan={6} className="px-2 pl-4 py-2 font-medium">
+                    Output CGST
+                  </td>
+                  <td className="border-r border-gray-300 px-2 py-2 text-center">
+                    {invoice.cgstRate}
+                  </td>
+                  <td className="px-2 py-2 pr-4 text-right">
+                    {formatCurrency(invoice.gstAmount / 2)}
                   </td>
                 </tr>
+                <tr className="border-b border-gray-300">
+                  <td colSpan={6} className="px-2 pl-4 py-2 font-medium">
+                    Output SGST
+                  </td>
+                  <td className="border-r border-gray-300 px-2 py-2 text-center">
+                    {invoice.sgstRate}
+                  </td>
+                  <td className="px-2 py-2 pr-4 text-right">
+                    {formatCurrency(invoice.gstAmount / 2)}
+                  </td>
+                </tr>
+                <tr className="border-b border-gray-300">
+                  <td colSpan={7} className="px-2 pl-4 py-2 font-medium">
+                    ROUND OFF
+                  </td>
+                  <td className="px-2 py-2 pr-4 text-right">{formatCurrency(invoice.roundOffAmount)}</td>
+                </tr>
+                <tr className="border-b-2 border-gray-900">
+                  <td colSpan={7} className="px-2 pl-4 py-2 font-bold">
+                    Total
+                  </td>
+                  <td className="px-2 py-2 pr-4 text-right font-bold">
+                    Rs {formatCurrency(invoice.totalAmount)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Amount in Words */}
+          <div className="border-b border-gray-400 px-4 py-3">
+            <p className="text-sm">
+              <span className="font-medium">Amount Chargeable (in words):</span>{" "}
+              <span className="font-bold">
+                {invoice.totalAmountInWords ||
+                  `${numberToWords(
+                    Math.floor(invoice.totalAmount)
+                  )} Rupees Only`}
+              </span>
+            </p>
+          </div>
+
+          {/* Tax Breakdown Table */}
+          <div className="border-b border-gray-400 px-4 py-3">
+            <table className="min-w-full text-xs border border-gray-300">
+              <thead className="bg-gray-50">
                 <tr>
-                  <th
-                    scope="row"
-                    colSpan={4}
-                    className="hidden pt-4 pl-4 pr-3 text-right text-sm font-normal text-gray-500 sm:table-cell sm:pl-0"
-                  >
-                    GST
+                  <th className="border border-gray-300 px-2 py-1 text-left">
+                    HSN/SAC
                   </th>
-                  <td className="pt-4 pl-3 pr-4 text-right text-sm text-gray-900 sm:pr-0">
+                  <th className="border border-gray-300 px-2 py-1 text-center">
+                    Taxable Value
+                  </th>
+                  <th className="border border-gray-300 px-2 py-1 text-center">
+                    Central Tax Rate
+                  </th>
+                  <th className="border border-gray-300 px-2 py-1 text-center">
+                    Amount
+                  </th>
+                  <th className="border border-gray-300 px-2 py-1 text-center">
+                    State Tax Rate
+                  </th>
+                  <th className="border border-gray-300 px-2 py-1 text-center">
+                    Amount
+                  </th>
+                  <th className="border border-gray-300 px-2 py-1 text-center">
+                    Total Tax Amount
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="border border-gray-300 px-2 py-1">69101000</td>
+                  <td className="border border-gray-300 px-2 py-1 text-center">
+                    {formatCurrency(invoice.subtotal)}
+                  </td>
+                  <td className="border border-gray-300 px-2 py-1 text-center">
+                    {invoice.cgstRate}%
+                  </td>
+                  <td className="border border-gray-300 px-2 py-1 text-center">
+                    {formatCurrency(invoice.gstAmount / 2)}
+                  </td>
+                  <td className="border border-gray-300 px-2 py-1 text-center">
+                    {invoice.sgstRate}%
+                  </td>
+                  <td className="border border-gray-300 px-2 py-1 text-center">
+                    {formatCurrency(invoice.gstAmount / 2)}
+                  </td>
+                  <td className="border border-gray-300 px-2 py-1 text-center">
                     {formatCurrency(invoice.gstAmount)}
                   </td>
                 </tr>
-                {invoice.sgstAmount > 0 && (
-                  <tr>
-                    <th
-                      scope="row"
-                      colSpan={4}
-                      className="hidden pt-4 pl-4 pr-3 text-right text-sm font-normal text-gray-500 sm:table-cell sm:pl-0"
-                    >
-                      SGST
-                    </th>
-                    <td className="pt-4 pl-3 pr-4 text-right text-sm text-gray-900 sm:pr-0">
-                      {formatCurrency(invoice.sgstAmount)}
-                    </td>
-                  </tr>
-                )}
-                {invoice.igstAmount > 0 && (
-                  <tr>
-                    <th
-                      scope="row"
-                      colSpan={4}
-                      className="hidden pt-4 pl-4 pr-3 text-right text-sm font-normal text-gray-500 sm:table-cell sm:pl-0"
-                    >
-                      IGST
-                    </th>
-                    <td className="pt-4 pl-3 pr-4 text-right text-sm text-gray-900 sm:pr-0">
-                      {formatCurrency(invoice.igstAmount)}
-                    </td>
-                  </tr>
-                )}
-                <tr>
-                  <th
-                    scope="row"
-                    colSpan={4}
-                    className="hidden pt-4 pl-4 pr-3 text-right text-sm font-semibold text-gray-900 sm:table-cell sm:pl-0"
-                  >
-                    Total
-                  </th>
-                  <td className="pt-4 pl-3 pr-4 text-right text-sm font-semibold text-gray-900 sm:pr-0">
-                    {formatCurrency(invoice.totalAmount)}
+                <tr className="font-bold">
+                  <td className="border border-gray-300 px-2 py-1">Total</td>
+                  <td className="border border-gray-300 px-2 py-1 text-center">
+                    {formatCurrency(invoice.subtotal)}
+                  </td>
+                  <td className="border border-gray-300 px-2 py-1"></td>
+                  <td className="border border-gray-300 px-2 py-1 text-center">
+                    {formatCurrency(invoice.gstAmount / 2)}
+                  </td>
+                  <td className="border border-gray-300 px-2 py-1"></td>
+                  <td className="border border-gray-300 px-2 py-1 text-center">
+                    {formatCurrency(invoice.gstAmount / 2)}
+                  </td>
+                  <td className="border border-gray-300 px-2 py-1 text-center">
+                    {formatCurrency(invoice.gstAmount)}
                   </td>
                 </tr>
-              </tfoot>
+              </tbody>
             </table>
           </div>
-          
-          {/* Amount in words */}
-          {invoice.totalAmountInWords && (
-            <div className="mt-8 text-right text-sm text-gray-500">
-              Amount in words: {invoice.totalAmountInWords}
+
+          {/* Tax Amount in Words */}
+          <div className="border-b border-gray-400 px-4 py-3">
+            <p className="text-sm">
+              <span className="font-medium">Tax Amount (in words):</span>{" "}
+              <span className="font-bold">
+                {numberToWords(Math.floor(invoice.gstAmount))} Rupees Only
+              </span>
+            </p>
+          </div>
+
+          {/* Footer Section */}
+          <div className="px-4 py-4">
+            <div className="grid grid-cols-2 gap-8">
+              <div className="space-y-3">
+                <p className="text-sm">
+                  <span className="font-medium">Company's Bank Details</span>
+                </p>
+                <p className="text-sm">
+                  <span className="font-medium">Bank Name:</span> UCO BANK
+                </p>
+                <p className="text-sm">
+                  <span className="font-medium">A/c No.:</span> XXXXXXXXXX
+                </p>
+                <p className="text-sm">
+                  <span className="font-medium">Branch & IFS Code:</span> MAHOBA
+                  CHARKHARI 0316
+                </p>
+                <div className="mt-4">
+                  <p className="text-sm">
+                    <span className="font-medium">Company's PAN:</span>{" "}
+                    AAACR1234C
+                  </p>
+                </div>
+                <div className="mt-4">
+                  <p className="text-sm font-medium">Declaration:</p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    We declare that this invoice shows the actual price
+                    <br />
+                    of the goods described and that all particulars are
+                    <br />
+                    true and correct.
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-sm">for {invoice.senderName}</p>
+                <div className="mt-8 mb-2">
+                  <div className="w-24 h-16 border border-gray-400 ml-auto flex items-center justify-center">
+                    <span className="text-xs text-gray-500">Signature</span>
+                  </div>
+                </div>
+                <p className="text-sm">Authorised Signatory</p>
+                <p className="text-sm">Name:</p>
+                <p className="text-sm">Designation:</p>
+              </div>
             </div>
-          )}
-        </div>
-        
-        {/* Notes */}
-        {invoice.notes && (
-          <div className="px-4 py-5 sm:px-6">
-            <h3 className="text-base font-semibold leading-6 text-gray-900">Notes</h3>
-            <div className="mt-2 text-sm text-gray-500 whitespace-pre-line">
-              {invoice.notes}
+            <div className="mt-6 text-center">
+              <p className="text-xs text-gray-500">
+                This is a Computer Generated Invoice
+              </p>
             </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
