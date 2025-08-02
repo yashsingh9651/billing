@@ -13,8 +13,6 @@ export async function GET(request: NextRequest) {
 
     // Get query parameters for filtering/pagination if needed
     const searchParams = request.nextUrl.searchParams;
-    const category = searchParams.get('category');
-    const categoryId = searchParams.get('categoryId');
     const isActive = searchParams.get('isActive');
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : undefined;
     const page = searchParams.get('page') ? parseInt(searchParams.get('page')!) : undefined;
@@ -22,8 +20,6 @@ export async function GET(request: NextRequest) {
 
     // Build where condition based on query params
     const where: any = {};
-    if (category) where.category = category;
-    if (categoryId) where.categoryId = categoryId;
     if (isActive !== null) where.isActive = isActive === 'true';
 
     // Get products with pagination and filtering
@@ -70,7 +66,7 @@ export async function POST(request: NextRequest) {
     // Validate required fields
     const requiredFields = [
       'name', 'quantity', 'buyingPrice', 'sellingPrice', 'wholesalePrice',
-      'mrp', 'unit', 'category', 'taxRate'
+      'mrp', 'unit', 'taxRate'
     ];
     
     for (const field of requiredFields) {
@@ -103,12 +99,12 @@ export async function POST(request: NextRequest) {
         discountPercentage: body.discountPercentage || 0,
         mrp: body.mrp,
         unit: body.unit,
-        category: body.category,
-        categoryId: body.categoryId || null,
         barcode: body.barcode,
+        supplier: body.supplier,
         taxRate: body.taxRate,
+        description: body.description,
         isActive: body.isActive !== undefined ? body.isActive : true,
-      },
+      } as any,
     });
 
     return NextResponse.json(product, { status: 201 });

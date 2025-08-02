@@ -137,22 +137,36 @@ export async function PUT(
           date: data.date || undefined,
           type: data.type || undefined,
           
-          senderName: data.senderName || undefined,
-          senderAddress: data.senderAddress || undefined,
-          senderGST: data.senderGST || undefined,
-          senderContact: data.senderContact || undefined,
+          // Update sender details only if it's a BUYING invoice (for SELLING, use user business details)
+          ...(data.type !== 'SELLING' ? {
+            senderName: data.senderName || undefined,
+            senderAddress: data.senderAddress || undefined,
+            senderGST: data.senderGST || undefined,
+            senderContact: data.senderContact || undefined,
+          } : {
+            senderName: session.user.businessName,
+            senderAddress: session.user.businessAddress,
+            senderGST: session.user.businessGST,
+            senderContact: session.user.businessContact,
+          }),
           
-          receiverName: data.receiverName || undefined,
-          receiverAddress: data.receiverAddress || undefined,
-          receiverGST: data.receiverGST || undefined,
-          receiverContact: data.receiverContact || undefined,
+          // Update receiver details only if it's a SELLING invoice (for BUYING, use user business details)
+          ...(data.type !== 'BUYING' ? {
+            receiverName: data.receiverName || undefined,
+            receiverAddress: data.receiverAddress || undefined,
+            receiverGST: data.receiverGST || undefined,
+            receiverContact: data.receiverContact || undefined,
+          } : {
+            receiverName: session.user.businessName,
+            receiverAddress: session.user.businessAddress,
+            receiverGST: session.user.businessGST,
+            receiverContact: session.user.businessContact,
+          }),
           
           subtotal,
-          gstAmount,
-          sgstAmount,
-          igstAmount,
-          totalAmount,
-          totalAmountInWords,
+          cgstRate: data.cgstRate !== undefined ? data.cgstRate : 0,
+          sgstRate: data.sgstRate !== undefined ? data.sgstRate : 0,
+          igstRate: data.igstRate !== undefined ? data.igstRate : 0,
           
           status: data.status || undefined,
           notes: data.notes || undefined,

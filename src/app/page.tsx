@@ -1,150 +1,210 @@
-import Image from "next/image";
-import Link from "next/link";
-import {
-  DocumentTextIcon,
-  ShoppingCartIcon,
-  ArrowRightIcon,
-  CurrencyRupeeIcon,
-  ChartPieIcon,
-  DocumentDuplicateIcon,
-} from "@heroicons/react/24/outline";
+'use client';
 
-export default function Home() {
+import { useEffect, useState } from 'react';
+import { ArrowDownIcon, ArrowUpIcon } from '@heroicons/react/20/solid';
+import { CurrencyDollarIcon, ShoppingBagIcon, DocumentTextIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
+import Link from 'next/link';
+
+function classNames(...classes: string[]) {
+  return classes.filter(Boolean).join(' ');
+}
+
+interface StatCardProps {
+  title: string;
+  value: string;
+  icon: React.ElementType;
+  change: number;
+  changeType: 'increase' | 'decrease';
+  href: string;
+}
+
+function StatCard({ title, value, icon: Icon, change, changeType, href }: StatCardProps) {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      {/* Hero Section */}
-      <div className="relative isolate px-6 pt-14 lg:px-8">
-        <div className="absolute inset-x-0 -top-40 -z-10 transform-gpu overflow-hidden blur-3xl sm:-top-80">
-          <div className="relative left-[calc(50%-11rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 rotate-[30deg] bg-gradient-to-tr from-indigo-200 to-indigo-800 opacity-20 sm:left-[calc(50%-30rem)] sm:w-[72.1875rem]"></div>
-        </div>
-        
-        <div className="mx-auto max-w-2xl py-16 sm:py-24 lg:py-28">
-          <div className="text-center">
-            <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl">
-              Billing & Inventory Management System
-            </h1>
-            <p className="mt-6 text-lg leading-8 text-gray-600">
-              Streamline your business operations with our comprehensive solution for managing products, invoices, and inventory all in one place.
-            </p>
-            <div className="mt-10 flex items-center justify-center gap-x-6">
-              <Link
-                href="/dashboard"
-                className="rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-              >
-                Go to Dashboard
-              </Link>
-              <Link
-                href="/login"
-                className="text-sm font-semibold leading-6 text-gray-900"
-              >
-                Log in <span aria-hidden="true">→</span>
-              </Link>
-            </div>
+    <div className="overflow-hidden rounded-lg bg-white shadow">
+      <div className="p-5">
+        <div className="flex items-center">
+          <div className="flex-shrink-0">
+            <Icon className="h-6 w-6 text-gray-400" aria-hidden="true" />
           </div>
-        </div>
-      </div>
-
-      {/* Features Section */}
-      <div className="py-12 sm:py-16">
-        <div className="mx-auto max-w-7xl px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl lg:text-center">
-            <h2 className="text-base font-semibold leading-7 text-indigo-600">Manage Everything</h2>
-            <p className="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-              Everything you need to run your business
-            </p>
-            <p className="mt-6 text-lg leading-8 text-gray-600">
-              Our platform provides all the tools you need to manage your inventory, create professional invoices, and track your business performance.
-            </p>
-          </div>
-          <div className="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-4xl">
-            <dl className="grid max-w-xl grid-cols-1 gap-x-8 gap-y-10 lg:max-w-none lg:grid-cols-2 lg:gap-y-16">
-              <div className="relative pl-16">
-                <dt className="text-base font-semibold leading-7 text-gray-900">
-                  <div className="absolute left-0 top-0 flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600">
-                    <ShoppingCartIcon className="h-6 w-6 text-white" aria-hidden="true" />
-                  </div>
-                  Product Management
-                </dt>
-                <dd className="mt-2 text-base leading-7 text-gray-600">
-                  Add, edit, and track your products with details like stock levels, prices, and specifications.
-                </dd>
-              </div>
-              <div className="relative pl-16">
-                <dt className="text-base font-semibold leading-7 text-gray-900">
-                  <div className="absolute left-0 top-0 flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600">
-                    <DocumentTextIcon className="h-6 w-6 text-white" aria-hidden="true" />
-                  </div>
-                  Invoice Management
-                </dt>
-                <dd className="mt-2 text-base leading-7 text-gray-600">
-                  Create professional invoices for both buying and selling transactions with automatic calculations and tax handling.
-                </dd>
-              </div>
-              <div className="relative pl-16">
-                <dt className="text-base font-semibold leading-7 text-gray-900">
-                  <div className="absolute left-0 top-0 flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600">
-                    <ChartPieIcon className="h-6 w-6 text-white" aria-hidden="true" />
-                  </div>
-                  Analytics Dashboard
-                </dt>
-                <dd className="mt-2 text-base leading-7 text-gray-600">
-                  Get insights into your business performance with visual charts and reports showing sales, inventory, and profit trends.
-                </dd>
-              </div>
-              <div className="relative pl-16">
-                <dt className="text-base font-semibold leading-7 text-gray-900">
-                  <div className="absolute left-0 top-0 flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600">
-                    <CurrencyRupeeIcon className="h-6 w-6 text-white" aria-hidden="true" />
-                  </div>
-                  GST Compliant
-                </dt>
-                <dd className="mt-2 text-base leading-7 text-gray-600">
-                  All invoices are GST compliant with automatic SGST/IGST calculations and tax reporting features.
-                </dd>
-              </div>
+          <div className="ml-5 w-0 flex-1">
+            <dl>
+              <dt className="truncate text-sm font-medium text-gray-500">{title}</dt>
+              <dd>
+                <div className="text-lg font-medium text-gray-900">{value}</div>
+              </dd>
             </dl>
           </div>
         </div>
       </div>
+      <div className="bg-gray-50 px-5 py-3">
+        <div className="flex items-center justify-between">
+          <div className="text-sm">
+            <span
+              className={classNames(
+                changeType === 'increase' ? 'text-green-600' : 'text-red-600',
+                'inline-flex items-center'
+              )}
+            >
+              {changeType === 'increase' ? (
+                <ArrowUpIcon className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
+              ) : (
+                <ArrowDownIcon className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
+              )}
+              {change}%
+            </span>
+            <span className="ml-1 text-gray-500">from last month</span>
+          </div>
+          <Link href={href} className="text-sm font-medium text-indigo-600 hover:text-indigo-500">
+            View all
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface RecentActivity {
+  id: string;
+  type: 'invoice' | 'product';
+  title: string;
+  date: string;
+  amount?: string;
+}
+
+export default function Home() {
+  const [stats, setStats] = useState({
+    totalSales: '₹0',
+    totalProducts: '0',
+    totalInvoices: '0',
+    lowStock: '0',
+  });
+  
+  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Simulate API call to fetch dashboard data
+    setTimeout(() => {
+      setStats({
+        totalSales: '₹45,000',
+        totalProducts: '24',
+        totalInvoices: '18',
+        lowStock: '3',
+      });
       
-      {/* CTA Section */}
-      <div className="bg-indigo-600 py-16">
-        <div className="mx-auto max-w-7xl px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-              Ready to streamline your business?
-            </h2>
-            <p className="mx-auto mt-6 max-w-xl text-lg leading-8 text-indigo-100">
-              Get started today and transform how you manage your inventory and billing processes.
-            </p>
-            <div className="mt-10 flex items-center justify-center gap-x-6">
-              <Link
-                href="/register"
-                className="rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-indigo-600 shadow-sm hover:bg-indigo-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-              >
-                Get started
-              </Link>
-              <Link
-                href="/dashboard"
-                className="text-sm font-semibold leading-6 text-white"
-              >
-                Explore features <span aria-hidden="true">→</span>
-              </Link>
-            </div>
+      setRecentActivity([
+        {
+          id: '1',
+          type: 'invoice',
+          title: 'Invoice #INV-001 created',
+          date: '2 hours ago',
+          amount: '₹5,600',
+        },
+        {
+          id: '2',
+          type: 'product',
+          title: 'Added 5 units of Product A',
+          date: '4 hours ago',
+        },
+        {
+          id: '3',
+          type: 'invoice',
+          title: 'Invoice #INV-002 paid',
+          date: '1 day ago',
+          amount: '₹12,400',
+        },
+        {
+          id: '4',
+          type: 'product',
+          title: 'Updated stock for Product B',
+          date: '2 days ago',
+        },
+      ]);
+      
+      setIsLoading(false);
+    }, 1000);
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="mb-8">
+        <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
+          Dashboard
+        </h2>
+      </div>
+
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Total Sales"
+          value={stats.totalSales}
+          icon={CurrencyDollarIcon}
+          change={12}
+          changeType="increase"
+          href="/invoices"
+        />
+        <StatCard
+          title="Total Products"
+          value={stats.totalProducts}
+          icon={ShoppingBagIcon}
+          change={5}
+          changeType="increase"
+          href="/products"
+        />
+        <StatCard
+          title="Total Invoices"
+          value={stats.totalInvoices}
+          icon={DocumentTextIcon}
+          change={8}
+          changeType="increase"
+          href="/invoices"
+        />
+        <StatCard
+          title="Low Stock Items"
+          value={stats.lowStock}
+          icon={ExclamationCircleIcon}
+          change={2}
+          changeType="decrease"
+          href="/products?filter=low-stock"
+        />
+      </div>
+
+      <div className="mt-10">
+        <h3 className="text-base font-semibold leading-6 text-gray-900">Recent Activity</h3>
+        <div className="mt-5 flow-root">
+          <div className="overflow-hidden rounded-lg bg-white shadow">
+            <ul role="list" className="divide-y divide-gray-200">
+              {recentActivity.map((activity) => (
+                <li key={activity.id} className="p-4 sm:px-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      {activity.type === 'invoice' ? (
+                        <DocumentTextIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                      ) : (
+                        <ShoppingBagIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                      )}
+                      <p className="ml-2 text-sm font-medium text-gray-900">{activity.title}</p>
+                    </div>
+                    <div className="flex items-center">
+                      {activity.amount && (
+                        <span className="mr-4 text-sm font-medium text-gray-900">{activity.amount}</span>
+                      )}
+                      <time className="text-sm text-gray-500">{activity.date}</time>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </div>
-      
-      {/* Footer */}
-      <footer className="bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-12 md:flex md:items-center md:justify-between lg:px-8">
-          <div className="flex justify-center space-x-6 md:order-2">
-            <p className="text-center text-xs leading-5 text-gray-500">
-              &copy; {new Date().getFullYear()} Billing & Inventory System. All rights reserved.
-            </p>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

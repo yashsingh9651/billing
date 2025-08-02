@@ -49,20 +49,16 @@ export interface Invoice {
   irn?: string;
   ackNo?: string;
   defaultHsnCode?: string;
+  roundOffAmount?: number;
   
   // Tax rates
   cgstRate?: number;
   sgstRate?: number;
+  igstRate?: number;
   
   // Items and totals
   items: InvoiceItem[];
   subtotal: number;
-  gstAmount: number;
-  cgst: number;
-  sgst: number;
-  igstAmount: number;
-  totalAmount: number;
-  totalAmountInWords: string;
   
   // Status and metadata
   status: InvoiceStatus;
@@ -77,21 +73,26 @@ export interface InvoiceCreateInput {
   type: InvoiceType;
   date?: string;
   
-  // Sender info
-  senderName: string;
-  senderAddress: string;
+  // Sender info - only required for BUYING type
+  senderName?: string;
+  senderAddress?: string;
   senderGST?: string;
-  senderContact: string;
+  senderContact?: string;
   
-  // Receiver info
-  receiverName: string;
-  receiverAddress: string;
+  // Receiver info - only required for SELLING type
+  receiverName?: string;
+  receiverAddress?: string;
   receiverGST?: string;
-  receiverContact: string;
+  receiverContact?: string;
   
   // Items and totals
   items: Omit<InvoiceItem, 'id'>[];
   notes?: string;
+  
+  // Tax rates (for different types of invoices)
+  cgstRate?: number;
+  sgstRate?: number;
+  igstRate?: number;
   
   // Inventory update flag for buying invoices
   updateInventory?: boolean;
@@ -162,12 +163,9 @@ export const invoiceApiSlice = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (result, error, id) => [
         { type: 'Invoices', id },
-        'Products' // Also invalidate products cache to refresh quantities
+        'Products'
       ],
     }),
-    
-    // PDF generation is now handled client-side in the invoice detail page
-    // The generatePdf endpoint has been removed
   }),
 });
 

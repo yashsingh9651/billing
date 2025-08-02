@@ -22,9 +22,6 @@ export async function GET(
     // Get product by ID
     const product = await prisma.product.findUnique({
       where: { id },
-      include: {
-        productCategory: true,
-      },
     });
 
     if (!product) {
@@ -92,8 +89,6 @@ export async function PUT(
         discountPercentage: body.discountPercentage !== undefined ? body.discountPercentage : undefined,
         mrp: body.mrp !== undefined ? body.mrp : undefined,
         unit: body.unit !== undefined ? body.unit : undefined,
-        category: body.category !== undefined ? body.category : undefined,
-        categoryId: body.categoryId !== undefined ? body.categoryId : undefined,
         barcode: body.barcode !== undefined ? body.barcode : undefined,
         supplier: body.supplier !== undefined ? body.supplier : undefined,
         taxRate: body.taxRate !== undefined ? body.taxRate : undefined,

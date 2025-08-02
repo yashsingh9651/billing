@@ -61,12 +61,18 @@ export async function POST(req: NextRequest) {
     }
     
     const data = await req.json();
+    console.log('Received data:', data);
     
-    // Validate required fields
-    const requiredFields = [
-      'type', 'senderName', 'senderAddress', 'senderContact',
-      'receiverName', 'receiverAddress', 'receiverContact', 'items'
-    ];
+    // Validate required fields based on invoice type
+    let requiredFields = ['type', 'items'];
+    
+    if (data.type === 'BUYING') {
+      // For buying invoices, only sender details are required (receiver is the user)
+      requiredFields = [...requiredFields, 'senderName', 'senderAddress', 'senderContact'];
+    } else if (data.type === 'SELLING') {
+      // For selling invoices, only receiver details are required (sender is the user)
+      requiredFields = [...requiredFields, 'receiverName', 'receiverAddress', 'receiverContact'];
+    }
     
     const missingFields = requiredFields.filter(field => !data[field]);
     if (missingFields.length > 0) {
@@ -120,58 +126,10 @@ export async function POST(req: NextRequest) {
     // Calculate totals
     const subtotal = data.items.reduce((sum: number, item: any) => sum + item.amount, 0);
     
-    // Use tax rates from the frontend or default to 18% total
-    const cgstRate = data.cgstRate !== undefined ? data.cgstRate / 100 : 0.09; // Convert from percentage
-    const sgstRate = data.sgstRate !== undefined ? data.sgstRate / 100 : 0.09; // Convert from percentage
-    const igstRate = data.igstRate !== undefined ? data.igstRate / 100 : 0; // Convert from percentage
-    
-    const sgstAmount = subtotal * sgstRate;
-    const cgstAmount = subtotal * cgstRate;
-    const igstAmount = subtotal * igstRate;
-    const gstAmount = sgstAmount + cgstAmount + igstAmount;
-    const totalAmount = subtotal + gstAmount;
-    
-    // Convert total to words (simplified)
-    function numberToWords(num: number) {
-      const units = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
-      const teens = ['', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
-      const tens = ['', 'Ten', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-      
-      if (num === 0) return 'Zero';
-      
-      const convertLessThanOneThousand = (num: number) => {
-        let result = '';
-        if (num >= 100) {
-          result += units[Math.floor(num / 100)] + ' Hundred ';
-          num %= 100;
-        }
-        if (num >= 11 && num <= 19) {
-          result += teens[num - 10];
-        } else {
-          result += tens[Math.floor(num / 10)];
-          if (Math.floor(num / 10) > 0 && num % 10 > 0) {
-            result += ' ';
-          }
-          result += units[num % 10];
-        }
-        return result;
-      };
-      
-      let result = '';
-      if (num >= 100000) {
-        result += convertLessThanOneThousand(Math.floor(num / 100000)) + ' Lakh ';
-        num %= 100000;
-      }
-      if (num >= 1000) {
-        result += convertLessThanOneThousand(Math.floor(num / 1000)) + ' Thousand ';
-        num %= 1000;
-      }
-      result += convertLessThanOneThousand(num);
-      
-      return result.trim();
-    }
-    
-    const totalAmountInWords = `${numberToWords(Math.floor(totalAmount))} Rupees Only`;
+    // Use tax rates from the frontend
+    const cgstRate = data.cgstRate !== undefined ? data.cgstRate : 0;
+    const sgstRate = data.sgstRate !== undefined ? data.sgstRate : 0;
+    const igstRate = data.igstRate !== undefined ? data.igstRate : 0;
     
     // Create the invoice and its items
     try {
@@ -195,22 +153,22 @@ export async function POST(req: NextRequest) {
         date: data.date ? new Date(data.date) : new Date(),
         type: data.type,
         
-        senderName: data.senderName,
-        senderAddress: data.senderAddress,
-        senderGST: data.senderGST,
-        senderContact: data.senderContact,
+        // Set sender details based on invoice type
+        senderName: data.type === 'SELLING' ? session.user.businessName : data.senderName,
+        senderAddress: data.type === 'SELLING' ? session.user.businessAddress : data.senderAddress,
+        senderGST: data.type === 'SELLING' ? session.user.businessGST : data.senderGST,
+        senderContact: data.type === 'SELLING' ? session.user.businessContact : data.senderContact,
         
-        receiverName: data.receiverName,
-        receiverAddress: data.receiverAddress,
-        receiverGST: data.receiverGST,
-        receiverContact: data.receiverContact,
+        // Set receiver details based on invoice type
+        receiverName: data.type === 'BUYING' ? session.user.businessName : data.receiverName,
+        receiverAddress: data.type === 'BUYING' ? session.user.businessAddress : data.receiverAddress,
+        receiverGST: data.type === 'BUYING' ? session.user.businessGST : data.receiverGST,
+        receiverContact: data.type === 'BUYING' ? session.user.businessContact : data.receiverContact,
         
         subtotal,
-        gstAmount,
-        sgstAmount,
-        igstAmount,
-        totalAmount,
-        totalAmountInWords,
+        cgstRate,
+        sgstRate,
+        igstRate,
         
         status: 'DRAFT',
         notes: data.notes,

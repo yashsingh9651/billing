@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import {
   ArrowLeftIcon,
@@ -12,6 +12,7 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import jsPDF from "jspdf";
 import QRCode from "qrcode";
+import { useSession } from "next-auth/react";
 
 // Function to format date
 const formatDate = (dateString: string): string => {
@@ -143,9 +144,47 @@ export default function InvoiceDetailsPage() {
   const params = useParams<{ id: string }>();
   const [isPdfGenerating, setIsPdfGenerating] = useState(false);
   const invoiceRef = useRef<HTMLDivElement>(null);
+  const { data: session } = useSession();
 
   const { data: invoice, isLoading, error } = useGetInvoiceByIdQuery(params.id);
-  const [updateInventory] = useUpdateInventoryMutation();
+
+  // Calculate tax amounts based on rates
+  const calculateTaxAmounts = (invoice: any) => {
+    if (!invoice)
+      return { cgst: 0, sgst: 0, igst: 0, totalTax: 0, totalAmount: 0 };
+
+    const subtotal = invoice.subtotal || 0;
+    const cgstRate = invoice.cgstRate || 0;
+    const sgstRate = invoice.sgstRate || 0;
+    const igstRate = invoice.igstRate || 0;
+
+    const cgst = (subtotal * cgstRate) / 100;
+    const sgst = (subtotal * sgstRate) / 100;
+    const igst = (subtotal * igstRate) / 100;
+
+    const totalTax = cgst + sgst + igst;
+    const totalBeforeRounding = subtotal + totalTax;
+    const roundOffAmount =
+      invoice.roundOffAmount ||
+      Math.round(
+        (totalBeforeRounding - Math.floor(totalBeforeRounding)) * 100
+      ) / 100;
+    const totalAmount = Math.round(totalBeforeRounding);
+
+    return { cgst, sgst, igst, totalTax, totalAmount, roundOffAmount };
+  };
+
+  // Get calculated values
+  const taxAmounts = invoice
+    ? calculateTaxAmounts(invoice)
+    : {
+        cgst: 0,
+        sgst: 0,
+        igst: 0,
+        totalTax: 0,
+        totalAmount: 0,
+        roundOffAmount: 0,
+      };
 
   // Generate QR Code
   const generateQRCode = async (data: string): Promise<string> => {
@@ -178,7 +217,7 @@ export default function InvoiceDetailsPage() {
       const contentWidth = pageWidth - margin * 2;
 
       // Generate QR Code
-      const qrData = `Invoice: ${invoice.invoiceNumber}, Date: ${invoice.date}, Amount: ${invoice.totalAmount}, GSTIN: ${invoice.senderGST}`;
+      const qrData = `Invoice: ${invoice.invoiceNumber}, Date: ${invoice.date}, Amount: ${taxAmounts.totalAmount}, GSTIN: ${invoice.senderGST}`;
       const qrCodeDataUrl = await generateQRCode(qrData);
 
       // Header - Tax Invoice
@@ -205,87 +244,81 @@ export default function InvoiceDetailsPage() {
 
       let yPos = margin + 25;
 
-      // IRN and Invoice Details
+      // Invoice Details - Simplified header to match web UI
       pdf.setFontSize(8);
-      pdf.setFont("helvetica", "normal");
-      pdf.text(`IRN: ${invoice.irn || "N/A"}`, margin, yPos);
-      pdf.text(`Invoice No: ${invoice.invoiceNumber}`, margin + 100, yPos);
-      yPos += 4;
-      pdf.text(`Ack No: ${invoice.ackNo || "N/A"}`, margin, yPos);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(`Invoice No: ${invoice.invoiceNumber}`, margin, yPos);
       pdf.text(`Dated: ${formatDate(invoice.date)}`, margin + 100, yPos);
-      yPos += 4;
-      pdf.text(`Ack Date: ${formatDate(invoice.date)}`, margin, yPos);
 
       yPos += 10;
 
       // Company Details Section
       pdf.setDrawColor(0, 0, 0);
-      pdf.rect(margin, yPos, contentWidth, 35);
+      pdf.rect(margin, yPos, contentWidth / 2, 35);
+      pdf.rect(margin + contentWidth / 2, yPos, contentWidth / 2, 35);
 
-      pdf.setFontSize(12);
+      // Seller Details
+      pdf.setFontSize(10);
       pdf.setFont("helvetica", "bold");
-      pdf.text(invoice.senderName, margin + 2, yPos + 8);
+      pdf.text("Seller (Bill From)", margin + 2, yPos + 6);
+
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(invoice.senderName, margin + 2, yPos + 12);
 
       pdf.setFontSize(8);
       pdf.setFont("helvetica", "normal");
       const senderAddressLines = invoice.senderAddress.split("\n");
       senderAddressLines.forEach((line, index) => {
-        pdf.text(line, margin + 2, yPos + 15 + index * 3);
+        pdf.text(line, margin + 2, yPos + 17 + index * 3);
       });
 
+      const startGSTLine = 17 + senderAddressLines.length * 3;
       pdf.text(
         `GSTIN/UIN: ${invoice.senderGST || "N/A"}`,
         margin + 2,
-        yPos + 28
+        yPos + startGSTLine
       );
       pdf.text(
-        `State Name: ${invoice.senderState || "N/A"}, Code: 09`,
+        `State Name: ${invoice.senderState || "N/A"}`,
         margin + 2,
-        yPos + 32
+        yPos + startGSTLine + 4
       );
       pdf.text(
-        `E-Mail: ${invoice.senderEmail || "N/A"}`,
-        margin + 100,
-        yPos + 28
-      );
-      pdf.text(`Contact: ${invoice.senderContact}`, margin + 100, yPos + 32);
-
-      yPos += 40;
-
-      // Consignee and Buyer Details
-      pdf.rect(margin, yPos, contentWidth / 2, 30);
-      pdf.rect(margin + contentWidth / 2, yPos, contentWidth / 2, 30);
-
-      // Consignee
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Consignee (Ship to)", margin + 2, yPos + 6);
-      pdf.setFont("helvetica", "normal");
-      pdf.text(invoice.receiverName, margin + 2, yPos + 12);
-      const receiverAddressLines = invoice.receiverAddress.split("\n");
-      receiverAddressLines.forEach((line, index) => {
-        pdf.text(line, margin + 2, yPos + 16 + index * 3);
-      });
-      pdf.text(
-        `GSTIN/UIN: ${invoice.receiverGST || "N/A"}`,
+        `Contact: ${invoice.senderContact || "N/A"}`,
         margin + 2,
-        yPos + 26
+        yPos + startGSTLine + 8
       );
 
-      // Buyer
+      // Buyer Details
+      pdf.setFontSize(10);
       pdf.setFont("helvetica", "bold");
       pdf.text("Buyer (Bill to)", margin + contentWidth / 2 + 2, yPos + 6);
-      pdf.setFont("helvetica", "normal");
+
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "bold");
       pdf.text(invoice.receiverName, margin + contentWidth / 2 + 2, yPos + 12);
+
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "normal");
+      const receiverAddressLines = invoice.receiverAddress.split("\n");
       receiverAddressLines.forEach((line, index) => {
-        pdf.text(line, margin + contentWidth / 2 + 2, yPos + 16 + index * 3);
+        pdf.text(line, margin + contentWidth / 2 + 2, yPos + 17 + index * 3);
       });
+
+      const buyerGSTLine = 17 + receiverAddressLines.length * 3;
       pdf.text(
         `GSTIN/UIN: ${invoice.receiverGST || "N/A"}`,
         margin + contentWidth / 2 + 2,
-        yPos + 26
+        yPos + buyerGSTLine
+      );
+      pdf.text(
+        `State Name: ${invoice.receiverState || "N/A"}`,
+        margin + contentWidth / 2 + 2,
+        yPos + buyerGSTLine + 4
       );
 
-      yPos += 35;
+      yPos += 40;
 
       // Items Table
       const tableHeaders = [
@@ -345,7 +378,15 @@ export default function InvoiceDetailsPage() {
         pdf.text(`${item.discount}%`, xPos + 1, yPos + 5);
         xPos += colWidths[6];
 
-        pdf.text(formatCurrency(item.amount), xPos + 1, yPos + 5);
+        // Format currency directly for PDF to avoid special characters
+        pdf.text(
+          item.amount.toLocaleString("en-IN", {
+            maximumFractionDigits: 2,
+            minimumFractionDigits: 2,
+          }),
+          xPos + 1,
+          yPos + 5
+        );
 
         // Draw borders
         xPos = margin;
@@ -365,84 +406,158 @@ export default function InvoiceDetailsPage() {
       });
 
       // Tax calculations
-      const cgstAmount = invoice.gstAmount / 2;
-      const sgstAmount = invoice.gstAmount / 2;
+      const cgstAmount = taxAmounts.cgst;
+      const sgstAmount = taxAmounts.sgst;
+      const igstAmount = taxAmounts.igst;
+      const totalGSTAmount = taxAmounts.totalTax;
 
-      // CGST row
+      // CGST row - without full table lines, just a bottom border
+      pdf.text(`Output CGST`, margin + 2, yPos + 5);
+
+      // Only draw vertical line for rate column
       xPos = margin;
       for (let i = 0; i < 6; i++) xPos += colWidths[i];
-      pdf.text("Output CGST 9%", margin + 2, yPos + 5);
-      pdf.text("9%", xPos + 1, yPos + 5);
+      pdf.text(`${invoice.cgstRate || 0}%`, xPos + 1, yPos + 5);
+
+      // Only draw amount at the right position
       xPos += colWidths[6];
-      pdf.text(formatCurrency(cgstAmount), xPos + 1, yPos + 5);
+      pdf.text(
+        cgstAmount.toLocaleString("en-IN", {
+          maximumFractionDigits: 2,
+          minimumFractionDigits: 2,
+        }),
+        xPos + 1,
+        yPos + 5
+      );
 
-      // Draw borders for CGST row
-      xPos = margin;
-      colWidths.forEach((width) => {
-        pdf.line(xPos, yPos, xPos, yPos + 8);
-        xPos += width;
-      });
-      pdf.line(xPos, yPos, xPos, yPos + 8);
-      pdf.line(margin, yPos + 8, margin + contentWidth, yPos + 8);
-      yPos += 8;
-
-      // SGST row
+      // Draw only the vertical borders for the rate column and right edge, plus bottom border
+      pdf.line(margin, yPos, margin, yPos + 8); // Left edge
       xPos = margin;
       for (let i = 0; i < 6; i++) xPos += colWidths[i];
-      pdf.text("Output SGST 9%", margin + 2, yPos + 5);
-      pdf.text("9%", xPos + 1, yPos + 5);
+      pdf.line(xPos, yPos, xPos, yPos + 8); // Before rate
       xPos += colWidths[6];
-      pdf.text(formatCurrency(sgstAmount), xPos + 1, yPos + 5);
-
-      // Draw borders for SGST row
-      xPos = margin;
-      colWidths.forEach((width) => {
-        pdf.line(xPos, yPos, xPos, yPos + 8);
-        xPos += width;
-      });
-      pdf.line(xPos, yPos, xPos, yPos + 8);
-      pdf.line(margin, yPos + 8, margin + contentWidth, yPos + 8);
+      pdf.line(xPos, yPos, xPos, yPos + 8); // Right edge
+      pdf.line(margin, yPos + 8, margin + contentWidth, yPos + 8); // Bottom line
       yPos += 8;
 
-      // Round off row
+      // SGST row - without full table lines, just a bottom border
+      pdf.text(`Output SGST`, margin + 2, yPos + 5);
+
+      // Only draw vertical line for rate column
+      xPos = margin;
+      for (let i = 0; i < 6; i++) xPos += colWidths[i];
+      pdf.text(`${invoice.sgstRate || 0}%`, xPos + 1, yPos + 5);
+
+      // Only draw amount at the right position
+      xPos += colWidths[6];
+      pdf.text(
+        sgstAmount.toLocaleString("en-IN", {
+          maximumFractionDigits: 2,
+          minimumFractionDigits: 2,
+        }),
+        xPos + 1,
+        yPos + 5
+      );
+
+      // Draw only the vertical borders for the rate column and right edge, plus bottom border
+      pdf.line(margin, yPos, margin, yPos + 8); // Left edge
+      xPos = margin;
+      for (let i = 0; i < 6; i++) xPos += colWidths[i];
+      pdf.line(xPos, yPos, xPos, yPos + 8); // Before rate
+      xPos += colWidths[6];
+      pdf.line(xPos, yPos, xPos, yPos + 8); // Right edge
+      pdf.line(margin, yPos + 8, margin + contentWidth, yPos + 8); // Bottom line
+      yPos += 8;
+
+      // IGST row - only if IGST is applicable
+      if (igstAmount > 0) {
+        pdf.text(`Output IGST`, margin + 2, yPos + 5);
+
+        // Only draw vertical line for rate column
+        xPos = margin;
+        for (let i = 0; i < 6; i++) xPos += colWidths[i];
+        pdf.text(`${invoice.igstRate || 0}%`, xPos + 1, yPos + 5);
+
+        // Only draw amount at the right position
+        xPos += colWidths[6];
+        pdf.text(
+          igstAmount.toLocaleString("en-IN", {
+            maximumFractionDigits: 2,
+            minimumFractionDigits: 2,
+          }),
+          xPos + 1,
+          yPos + 5
+        );
+
+        // Draw only the vertical borders for the rate column and right edge, plus bottom border
+        pdf.line(margin, yPos, margin, yPos + 8); // Left edge
+        xPos = margin;
+        for (let i = 0; i < 6; i++) xPos += colWidths[i];
+        pdf.line(xPos, yPos, xPos, yPos + 8); // Before rate
+        xPos += colWidths[6];
+        pdf.line(xPos, yPos, xPos, yPos + 8); // Right edge
+        pdf.line(margin, yPos + 8, margin + contentWidth, yPos + 8); // Bottom line
+        yPos += 8;
+      }
+
+      // Round off row - without full table lines, just a bottom border
       pdf.text("ROUND OFF", margin + 2, yPos + 5);
+
+      // Only draw amount at the right position
       xPos = margin;
       for (let i = 0; i < 7; i++) xPos += colWidths[i];
-      pdf.text("0.40", xPos + 1, yPos + 5);
+      const roundOffAmount = taxAmounts.roundOffAmount;
+      pdf.text(
+        parseFloat(roundOffAmount.toString()).toLocaleString("en-IN", {
+          maximumFractionDigits: 2,
+          minimumFractionDigits: 2,
+        }),
+        xPos + 1,
+        yPos + 5
+      );
 
-      // Draw borders for round off row
-      xPos = margin;
-      colWidths.forEach((width) => {
-        pdf.line(xPos, yPos, xPos, yPos + 8);
-        xPos += width;
-      });
-      pdf.line(xPos, yPos, xPos, yPos + 8);
-      pdf.line(margin, yPos + 8, margin + contentWidth, yPos + 8);
-      yPos += 8;
+      // Draw only the left and right vertical borders, plus bottom border
+      pdf.line(margin, yPos, margin, yPos + 8); // Left edge
+      xPos = margin + contentWidth;
+      pdf.line(xPos, yPos, xPos, yPos + 8); // Right edge
+      pdf.line(margin, yPos + 8, margin + contentWidth, yPos + 8); // Bottom line
 
-      // Total row
+      // Add extra space (5 lines) between roundoff and total
+      yPos += 40;
+
+      // Total row - with bold text but without full table lines
       pdf.setFont("helvetica", "bold");
       pdf.text("Total", margin + 2, yPos + 5);
+
+      // Only draw amount at the right position
       xPos = margin;
       for (let i = 0; i < 7; i++) xPos += colWidths[i];
-      pdf.text(`Rs ${formatCurrency(invoice.totalAmount)}`, xPos + 1, yPos + 5);
+      pdf.text(
+        `Rs ${taxAmounts.totalAmount.toLocaleString("en-IN", {
+          maximumFractionDigits: 2,
+          minimumFractionDigits: 2,
+        })}`,
+        xPos + 1,
+        yPos + 5
+      );
 
-      // Draw borders for total row
-      xPos = margin;
-      colWidths.forEach((width) => {
-        pdf.line(xPos, yPos, xPos, yPos + 8);
-        xPos += width;
-      });
-      pdf.line(xPos, yPos, xPos, yPos + 8);
-      pdf.line(margin, yPos + 8, margin + contentWidth, yPos + 8);
+      // Draw thicker borders to emphasize the total row
+      pdf.setLineWidth(0.5);
+      pdf.line(margin, yPos, margin, yPos + 8); // Left edge
+      xPos = margin + contentWidth;
+      pdf.line(xPos, yPos, xPos, yPos + 8); // Right edge
+      pdf.line(margin, yPos + 8, margin + contentWidth, yPos + 8); // Bottom line - make it thicker
 
-      yPos += 15;
+      // Reset line width
+      pdf.setLineWidth(0.2);
+
+      yPos += 15; // Normal spacing after total
 
       // Amount in words
       pdf.setFont("helvetica", "normal");
-      const amountInWords =
-        invoice.totalAmountInWords ||
-        `${numberToWords(Math.floor(invoice.totalAmount))} Rupees Only`;
+      const amountInWords = `${numberToWords(
+        Math.floor(taxAmounts.totalAmount)
+      )} Rupees Only`;
       pdf.text(`Amount Chargeable (in words): ${amountInWords}`, margin, yPos);
 
       yPos += 10;
@@ -477,19 +592,51 @@ export default function InvoiceDetailsPage() {
 
       // Tax table data row
       xPos = margin;
-      pdf.text("69101000", xPos + 1, yPos + 5);
+      pdf.text(invoice.defaultHsnCode || "69101000", xPos + 1, yPos + 5);
       xPos += taxColWidths[0];
-      pdf.text(formatCurrency(invoice.subtotal), xPos + 1, yPos + 5);
+      // Format currency directly for PDF
+      pdf.text(
+        invoice.subtotal.toLocaleString("en-IN", {
+          maximumFractionDigits: 2,
+          minimumFractionDigits: 2,
+        }),
+        xPos + 1,
+        yPos + 5
+      );
       xPos += taxColWidths[1];
-      pdf.text("9%", xPos + 1, yPos + 5);
+      pdf.text(`${invoice.cgstRate || 0}%`, xPos + 1, yPos + 5);
       xPos += taxColWidths[2];
-      pdf.text(formatCurrency(cgstAmount), xPos + 1, yPos + 5);
+      // Format currency directly for PDF
+      pdf.text(
+        taxAmounts.cgst.toLocaleString("en-IN", {
+          maximumFractionDigits: 2,
+          minimumFractionDigits: 2,
+        }),
+        xPos + 1,
+        yPos + 5
+      );
       xPos += taxColWidths[3];
-      pdf.text("9%", xPos + 1, yPos + 5);
+      pdf.text(`${invoice.sgstRate || 0}%`, xPos + 1, yPos + 5);
       xPos += taxColWidths[4];
-      pdf.text(formatCurrency(sgstAmount), xPos + 1, yPos + 5);
+      // Format currency directly for PDF
+      pdf.text(
+        taxAmounts.sgst.toLocaleString("en-IN", {
+          maximumFractionDigits: 2,
+          minimumFractionDigits: 2,
+        }),
+        xPos + 1,
+        yPos + 5
+      );
       xPos += taxColWidths[5];
-      pdf.text(formatCurrency(invoice.gstAmount), xPos + 1, yPos + 5);
+      // Format currency directly for PDF
+      pdf.text(
+        totalGSTAmount.toLocaleString("en-IN", {
+          maximumFractionDigits: 2,
+          minimumFractionDigits: 2,
+        }),
+        xPos + 1,
+        yPos + 5
+      );
 
       // Draw borders for tax data row
       xPos = margin;
@@ -507,13 +654,45 @@ export default function InvoiceDetailsPage() {
       xPos = margin;
       pdf.text("Total", xPos + 1, yPos + 5);
       xPos += taxColWidths[0];
-      pdf.text(formatCurrency(invoice.subtotal), xPos + 1, yPos + 5);
+      // Format currency directly for PDF
+      pdf.text(
+        invoice.subtotal.toLocaleString("en-IN", {
+          maximumFractionDigits: 2,
+          minimumFractionDigits: 2,
+        }),
+        xPos + 1,
+        yPos + 5
+      );
       xPos += taxColWidths[1] + taxColWidths[2];
-      pdf.text(formatCurrency(cgstAmount), xPos + 1, yPos + 5);
+      // Format currency directly for PDF
+      pdf.text(
+        taxAmounts.cgst.toLocaleString("en-IN", {
+          maximumFractionDigits: 2,
+          minimumFractionDigits: 2,
+        }),
+        xPos + 1,
+        yPos + 5
+      );
       xPos += taxColWidths[3] + taxColWidths[4];
-      pdf.text(formatCurrency(sgstAmount), xPos + 1, yPos + 5);
+      // Format currency directly for PDF
+      pdf.text(
+        taxAmounts.sgst.toLocaleString("en-IN", {
+          maximumFractionDigits: 2,
+          minimumFractionDigits: 2,
+        }),
+        xPos + 1,
+        yPos + 5
+      );
       xPos += taxColWidths[5];
-      pdf.text(formatCurrency(invoice.gstAmount), xPos + 1, yPos + 5);
+      // Format currency directly for PDF
+      pdf.text(
+        totalGSTAmount.toLocaleString("en-IN", {
+          maximumFractionDigits: 2,
+          minimumFractionDigits: 2,
+        }),
+        xPos + 1,
+        yPos + 5
+      );
 
       // Draw borders for tax total row
       xPos = margin;
@@ -530,36 +709,51 @@ export default function InvoiceDetailsPage() {
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(8);
       const taxAmountInWords = `${numberToWords(
-        Math.floor(invoice.gstAmount)
+        Math.floor(taxAmounts.totalTax)
       )} Rupees Only`;
       pdf.text(`Tax Amount (in words): ${taxAmountInWords}`, margin, yPos);
 
-      yPos += 10;
+      yPos += 15;
 
-      // Company's PAN and Declaration
-      pdf.text("Company's PAN: AAACR1234C", margin, yPos);
+      // Company Bank Details and Declaration - Added to match web UI
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Company's Bank Details", margin, yPos);
 
-      yPos += 8;
-      pdf.text("Declaration:", margin, yPos);
+      pdf.setFont("helvetica", "normal");
+      pdf.text("Bank Name: UCO BANK", margin, yPos + 5);
+      pdf.text("A/c No.: XXXXXXXXXX", margin, yPos + 10);
+      pdf.text("Branch & IFS Code: MAHOBA CHARKHARI 0316", margin, yPos + 15);
+
+      pdf.text("Company's PAN: AAACR1234C", margin, yPos + 25);
+
+      // Declaration
+      pdf.text("Declaration:", margin, yPos + 35);
+      pdf.setFontSize(7);
       pdf.text(
-        "We declare that this invoice shows the actual price",
+        "We declare that this invoice shows the actual price of the goods",
         margin,
-        yPos + 4
+        yPos + 40
       );
       pdf.text(
-        "of the goods described and that all particulars are",
+        "described and that all particulars are true and correct.",
         margin,
-        yPos + 8
+        yPos + 44
       );
-      pdf.text("true and correct.", margin, yPos + 12);
 
       // Signature section
+      pdf.setFontSize(8);
       pdf.text(`for ${invoice.senderName}`, margin + 120, yPos);
-      pdf.text("Authorised Signatory", margin + 120, yPos + 20);
+
+      // Signature box
+      pdf.rect(margin + 120, yPos + 5, 24, 16);
+      pdf.text("Authorised Signatory", margin + 120, yPos + 25);
+      pdf.text("Name:", margin + 120, yPos + 30);
+      pdf.text("Designation:", margin + 120, yPos + 35);
 
       // Footer
       pdf.setFontSize(7);
-      pdf.text("This is a Computer Generated Invoice", margin, 280);
+      pdf.text("This is a Computer Generated Invoice", pageWidth / 2 - 20, 280);
 
       pdf.save(`Tax-Invoice-${invoice.invoiceNumber || params.id}.pdf`);
     } catch (error) {
@@ -679,16 +873,11 @@ export default function InvoiceDetailsPage() {
                     <strong>GSTIN/UIN:</strong> {invoice.senderGST || "N/A"}
                   </p>
                   <p>
-                    <strong>State Name:</strong>{" "}
-                    {invoice.senderState || "N/A"}
-                  </p>
-                  <p>
-                    <strong>Contact:</strong>{" "}
-                    {invoice.senderContact || "N/A"}
+                    <strong>Contact:</strong> {invoice.senderContact || "N/A"}
                   </p>
                 </div>
               </div>
-              {/* Reciever Details */}
+              {/* Receiver Details */}
               <div className="px-4 py-4">
                 <h3 className="font-bold text-sm mb-2">Buyer (Bill to)</h3>
                 <div className="text-sm text-gray-700">
@@ -698,10 +887,6 @@ export default function InvoiceDetailsPage() {
                   </p>
                   <p>
                     <strong>GSTIN/UIN:</strong> {invoice.receiverGST || "N/A"}
-                  </p>
-                  <p>
-                    <strong>State Name:</strong>{" "}
-                    {invoice.receiverState || "N/A"}
                   </p>
                 </div>
               </div>
@@ -778,10 +963,10 @@ export default function InvoiceDetailsPage() {
                     Output CGST
                   </td>
                   <td className="border-r border-gray-300 px-2 py-2 text-center">
-                    {invoice.cgstRate}
+                    {invoice.cgstRate || 0}%
                   </td>
                   <td className="px-2 py-2 pr-4 text-right">
-                    {formatCurrency(invoice.gstAmount / 2)}
+                    {formatCurrency(taxAmounts.cgst)}
                   </td>
                 </tr>
                 <tr className="border-b border-gray-300">
@@ -789,24 +974,55 @@ export default function InvoiceDetailsPage() {
                     Output SGST
                   </td>
                   <td className="border-r border-gray-300 px-2 py-2 text-center">
-                    {invoice.sgstRate}
+                    {invoice.sgstRate || 0}%
                   </td>
                   <td className="px-2 py-2 pr-4 text-right">
-                    {formatCurrency(invoice.gstAmount / 2)}
+                    {formatCurrency(taxAmounts.sgst)}
                   </td>
                 </tr>
+                {taxAmounts.igst > 0 && (
+                  <tr className="border-b border-gray-300">
+                    <td colSpan={6} className="px-2 pl-4 py-2 font-medium">
+                      Output IGST
+                    </td>
+                    <td className="border-r border-gray-300 px-2 py-2 text-center">
+                      {invoice.igstRate || 0}%
+                    </td>
+                    <td className="px-2 py-2 pr-4 text-right">
+                      {formatCurrency(taxAmounts.igst)}
+                    </td>
+                  </tr>
+                )}
                 <tr className="border-b border-gray-300">
                   <td colSpan={7} className="px-2 pl-4 py-2 font-medium">
                     ROUND OFF
                   </td>
-                  <td className="px-2 py-2 pr-4 text-right">{formatCurrency(invoice.roundOffAmount)}</td>
+                  <td className="px-2 py-2 pr-4 text-right">
+                    {formatCurrency(taxAmounts.roundOffAmount)}
+                  </td>
+                </tr>
+                {/* Add 5 empty rows for spacing between roundoff and total */}
+                <tr className="h-6">
+                  <td colSpan={8}></td>
+                </tr>
+                <tr className="h-6">
+                  <td colSpan={8}></td>
+                </tr>
+                <tr className="h-6">
+                  <td colSpan={8}></td>
+                </tr>
+                <tr className="h-6">
+                  <td colSpan={8}></td>
+                </tr>
+                <tr className="h-6">
+                  <td colSpan={8}></td>
                 </tr>
                 <tr className="border-b-2 border-gray-900">
                   <td colSpan={7} className="px-2 pl-4 py-2 font-bold">
                     Total
                   </td>
                   <td className="px-2 py-2 pr-4 text-right font-bold">
-                    Rs {formatCurrency(invoice.totalAmount)}
+                    Rs {formatCurrency(taxAmounts.totalAmount)}
                   </td>
                 </tr>
               </tbody>
@@ -818,10 +1034,7 @@ export default function InvoiceDetailsPage() {
             <p className="text-sm">
               <span className="font-medium">Amount Chargeable (in words):</span>{" "}
               <span className="font-bold">
-                {invoice.totalAmountInWords ||
-                  `${numberToWords(
-                    Math.floor(invoice.totalAmount)
-                  )} Rupees Only`}
+                {numberToWords(Math.floor(taxAmounts.totalAmount))} Rupees Only
               </span>
             </p>
           </div>
@@ -856,24 +1069,26 @@ export default function InvoiceDetailsPage() {
               </thead>
               <tbody>
                 <tr>
-                  <td className="border border-gray-300 px-2 py-1">69101000</td>
+                  <td className="border border-gray-300 px-2 py-1">
+                    {invoice.defaultHsnCode || "69101000"}
+                  </td>
                   <td className="border border-gray-300 px-2 py-1 text-center">
                     {formatCurrency(invoice.subtotal)}
                   </td>
                   <td className="border border-gray-300 px-2 py-1 text-center">
-                    {invoice.cgstRate}%
+                    {invoice.cgstRate || 0}%
                   </td>
                   <td className="border border-gray-300 px-2 py-1 text-center">
-                    {formatCurrency(invoice.gstAmount / 2)}
+                    {formatCurrency(taxAmounts.cgst)}
                   </td>
                   <td className="border border-gray-300 px-2 py-1 text-center">
-                    {invoice.sgstRate}%
+                    {invoice.sgstRate || 0}%
                   </td>
                   <td className="border border-gray-300 px-2 py-1 text-center">
-                    {formatCurrency(invoice.gstAmount / 2)}
+                    {formatCurrency(taxAmounts.sgst)}
                   </td>
                   <td className="border border-gray-300 px-2 py-1 text-center">
-                    {formatCurrency(invoice.gstAmount)}
+                    {formatCurrency(taxAmounts.totalTax)}
                   </td>
                 </tr>
                 <tr className="font-bold">
@@ -883,14 +1098,14 @@ export default function InvoiceDetailsPage() {
                   </td>
                   <td className="border border-gray-300 px-2 py-1"></td>
                   <td className="border border-gray-300 px-2 py-1 text-center">
-                    {formatCurrency(invoice.gstAmount / 2)}
+                    {formatCurrency(taxAmounts.cgst)}
                   </td>
                   <td className="border border-gray-300 px-2 py-1"></td>
                   <td className="border border-gray-300 px-2 py-1 text-center">
-                    {formatCurrency(invoice.gstAmount / 2)}
+                    {formatCurrency(taxAmounts.sgst)}
                   </td>
                   <td className="border border-gray-300 px-2 py-1 text-center">
-                    {formatCurrency(invoice.gstAmount)}
+                    {formatCurrency(taxAmounts.totalTax)}
                   </td>
                 </tr>
               </tbody>
@@ -902,7 +1117,7 @@ export default function InvoiceDetailsPage() {
             <p className="text-sm">
               <span className="font-medium">Tax Amount (in words):</span>{" "}
               <span className="font-bold">
-                {numberToWords(Math.floor(invoice.gstAmount))} Rupees Only
+                {numberToWords(Math.floor(taxAmounts.totalTax))} Rupees Only
               </span>
             </p>
           </div>

@@ -14,6 +14,27 @@ import {
 import { useGetInvoicesQuery, useDeleteInvoiceMutation } from '@/redux/services/invoiceApiSlice';
 import { formatCurrency, formatDate } from '@/lib/utils';
 
+// Function to calculate the total invoice amount
+const calculateInvoiceTotal = (invoice: any) => {
+  if (!invoice) return 0;
+  
+  const subtotal = invoice.subtotal || 0;
+  const cgstRate = invoice.cgstRate || 0;
+  const sgstRate = invoice.sgstRate || 0;
+  const igstRate = invoice.igstRate || 0;
+  
+  const cgst = (subtotal * cgstRate) / 100;
+  const sgst = (subtotal * sgstRate) / 100;
+  const igst = (subtotal * igstRate) / 100;
+  
+  const totalTax = cgst + sgst + igst;
+  const totalBeforeRounding = subtotal + totalTax;
+  const roundOffAmount = invoice.roundOffAmount || Math.round((totalBeforeRounding - Math.floor(totalBeforeRounding)) * 100) / 100;
+  
+  // Return the rounded total
+  return Math.round(totalBeforeRounding);
+};
+
 // Invoice type filter options
 const invoiceTypeFilters = [
   { id: 'all', name: 'All' },
@@ -151,7 +172,7 @@ export default function InvoicesPage() {
         </div>
         <div className="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
           <Link
-            href="/dashboard/invoices/create"
+            href="/invoices/create"
             className="block rounded-md bg-indigo-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
           >
             <span className="flex items-center">
@@ -228,7 +249,7 @@ export default function InvoicesPage() {
                   <p className="text-gray-500 mt-4">No invoices found matching your filters.</p>
                   <div className="mt-6">
                     <Link
-                      href="/dashboard/invoices/create"
+                      href="/invoices/create"
                       className="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                     >
                       <PlusIcon className="-ml-0.5 mr-1.5 h-5 w-5" aria-hidden="true" />
@@ -270,7 +291,7 @@ export default function InvoicesPage() {
                     {filteredInvoices.map((invoice) => (
                       <tr key={invoice.id} className="hover:bg-gray-50">
                         <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-indigo-600 sm:pl-6">
-                          <Link href={`/dashboard/invoices/${invoice.id}`} className="hover:underline">
+                          <Link href={`/invoices/${invoice.id}`} className="hover:underline">
                             INV-{invoice.invoiceNumber.toString().padStart(5, '0')}
                           </Link>
                         </td>
@@ -295,7 +316,7 @@ export default function InvoicesPage() {
                           {invoice.receiverName}
                         </td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                          {formatCurrency(invoice.totalAmount)}
+                          {formatCurrency(calculateInvoiceTotal(invoice))}
                         </td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                           <InvoiceStatusBadge status={invoice.status} />
@@ -303,14 +324,14 @@ export default function InvoicesPage() {
                         <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                           <div className="flex items-center justify-end space-x-3">
                             <Link
-                              href={`/dashboard/invoices/${invoice.id}`}
+                              href={`/invoices/${invoice.id}`}
                               className="text-indigo-600 hover:text-indigo-900"
                               title="View"
                             >
                               View
                             </Link>
                             <Link
-                              href={`/dashboard/invoices/${invoice.id}/edit`}
+                              href={`/invoices/${invoice.id}/edit`}
                               className="text-indigo-600 hover:text-indigo-900"
                               title="Edit"
                             >

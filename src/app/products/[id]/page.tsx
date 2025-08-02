@@ -25,7 +25,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
       setIsDeleting(true);
       try {
         await deleteProduct(productId).unwrap();
-        router.push('/dashboard/products');
+        router.push('/products');
       } catch (error) {
         console.error('Failed to delete the product:', error);
         alert('Failed to delete the product. Please try again.');
@@ -49,7 +49,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <p className="text-red-500">Error loading product details.</p>
-            <Link href="/dashboard/products" className="mt-4 text-blue-600 hover:text-blue-800">
+            <Link href="/products" className="mt-4 text-blue-600 hover:text-blue-800">
               Return to Products
             </Link>
           </div>
@@ -64,7 +64,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <p className="text-gray-500">Product not found.</p>
-            <Link href="/dashboard/products" className="mt-4 text-blue-600 hover:text-blue-800">
+            <Link href="/products" className="mt-4 text-blue-600 hover:text-blue-800">
               Return to Products
             </Link>
           </div>
@@ -78,14 +78,14 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Back button and Actions */}
         <div className="mb-6 flex justify-between items-center">
-          <Link href="/dashboard/products" className="flex items-center text-blue-600 hover:text-blue-800">
+          <Link href="/products" className="flex items-center text-blue-600 hover:text-blue-800">
             <ArrowLeftIcon className="h-4 w-4 mr-1" />
             Back to Products
           </Link>
           
           <div className="flex space-x-2">
             <Link
-              href={`/dashboard/products/${productId}/edit`}
+              href={`/products/${productId}/edit`}
               className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
             >
               <PencilIcon className="h-4 w-4 mr-1" />
@@ -114,11 +114,6 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
                 <dt className="text-sm font-medium text-gray-500">Product name</dt>
                 <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{product.name}</dd>
-              </div>
-              
-              <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
-                <dt className="text-sm font-medium text-gray-500">Category</dt>
-                <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{product.category}</dd>
               </div>
               
               <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">

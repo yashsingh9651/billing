@@ -32,6 +32,6 @@ export async function requireRole(requiredRoles: UserRole | UserRole[]) {
   const hasAccess = await hasRole(requiredRoles);
   
   if (!hasAccess) {
-    redirect("/dashboard"); // Redirect to dashboard or unauthorized page
+    redirect("/"); // Redirect to homepage or unauthorized page
   }
 }

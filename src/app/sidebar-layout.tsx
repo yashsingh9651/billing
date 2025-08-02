@@ -17,24 +17,24 @@ import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
+  { name: 'Dashboard', href: '/', icon: HomeIcon },
   { 
     name: 'Products', 
-    href: '/dashboard/products', 
+    href: '/products', 
     icon: ShoppingCartIcon,
     children: [
-      { name: 'All Products', href: '/dashboard/products' },
-      { name: 'Categories', href: '/dashboard/products/categories' },
+      { name: 'Add Products', href: '/products/add' },
     ]
   },
-  { name: 'Invoices', href: '/dashboard/invoices', icon: DocumentTextIcon },
+  { name: 'Invoices', href: '/invoices', icon: DocumentTextIcon },
+  { name: 'Create Invoice', href: '/invoices/create', icon: DocumentTextIcon },
 ];
 
 function classNames(...classes: string[]) {
   return classes.filter(Boolean).join(' ');
 }
 
-export default function DashboardLayout({
+export default function SidebarLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -161,6 +161,18 @@ export default function DashboardLayout({
                           ))}
                         </ul>
                       </li>
+                      <li className="mt-auto">
+                        <Link
+                          href="/settings"
+                          className="group -mx-2 flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
+                        >
+                          <CogIcon
+                            className="h-6 w-6 shrink-0 text-gray-400 group-hover:text-blue-600"
+                            aria-hidden="true"
+                          />
+                          Settings
+                        </Link>
+                      </li>
                     </ul>
                   </nav>
                 </div>
@@ -246,7 +258,7 @@ export default function DashboardLayout({
               </li>
               <li className="mt-auto">
                 <Link
-                  href="/dashboard/settings"
+                  href="/settings"
                   className="group -mx-2 flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
                 >
                   <CogIcon
@@ -299,7 +311,7 @@ export default function DashboardLayout({
                     <Menu.Item>
                       {({ active }) => (
                         <Link
-                          href="/dashboard/profile"
+                          href="/profile"
                           className={classNames(
                             active ? 'bg-blue-50 text-blue-600' : 'text-gray-900',
                             'block px-3 py-1 text-sm leading-6'

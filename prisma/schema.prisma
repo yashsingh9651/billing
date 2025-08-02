@@ -31,16 +31,6 @@ model User {
   updatedAt     DateTime  @updatedAt
 }
 
-// Product Category model
-model ProductCategory {
-  id          String    @id @default(cuid())
-  name        String    @unique
-  description String?
-  products    Product[] @relation("ProductToCategory")
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-}
-
 // Product model
 model Product {
   id                String          @id @default(cuid())
@@ -52,9 +42,6 @@ model Product {
   discountPercentage Float           @default(0)
   mrp               Float
   unit              String          // piece, kg, dozen, etc.
-  category          String          // Keeping this for backward compatibility
-  categoryId        String?
-  productCategory   ProductCategory? @relation("ProductToCategory", fields: [categoryId], references: [id])
   barcode           String?
   supplier          String?
   taxRate           Float           @default(0)
@@ -72,13 +59,13 @@ model Invoice {
   date              DateTime      @default(now())
   type              InvoiceType
   
-  // Sender info
+  // Sender info (only required for BUYING type)
   senderName        String
   senderAddress     String
   senderGST         String?
   senderContact     String
   
-  // Receiver info
+  // Receiver info (only required for SELLING type)
   receiverName      String
   receiverAddress   String
   receiverGST       String?
@@ -87,11 +74,9 @@ model Invoice {
   // Items and totals
   items             InvoiceItem[]
   subtotal          Float
-  gstAmount         Float
-  sgstAmount        Float
-  igstAmount        Float
-  totalAmount       Float
-  totalAmountInWords String
+  cgstRate          Float    @default(0)
+  sgstRate          Float    @default(0)
+  igstRate          Float    @default(0)
   
   // Status and metadata
   status            InvoiceStatus @default(DRAFT)

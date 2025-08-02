@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
-import { productApiSlice, useGetCategoriesQuery } from '@/redux/services/productApiSlice';
+import { productApiSlice } from '@/redux/services/productApiSlice';
 
 // Define the form schema using Zod
 const productSchema = z.object({
@@ -19,8 +19,6 @@ const productSchema = z.object({
   discountPercentage: z.coerce.number().min(0, 'Discount cannot be negative').max(100, 'Discount cannot be more than 100%'),
   mrp: z.coerce.number().min(0, 'MRP cannot be negative'),
   unit: z.string().min(1, 'Unit is required'),
-  category: z.string().min(1, 'Category is required'),
-  categoryId: z.string().optional(),
   barcode: z.string().optional(),
   taxRate: z.coerce.number().min(0, 'Tax rate cannot be negative'),
   isActive: z.boolean().default(true),
@@ -33,9 +31,6 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
   const router = useRouter();
   const productId = params.id;
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Fetch categories using RTK Query
-  const { data: categoriesData } = useGetCategoriesQuery();
   
   // Fetch product data
   const {
@@ -53,7 +48,6 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
     handleSubmit,
     formState: { errors },
     reset,
-    setValue,
   } = useForm<ProductFormData>({
     resolver: zodResolver(productSchema) as any,
     defaultValues: {
@@ -65,67 +59,30 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
       discountPercentage: 0,
       mrp: 0,
       unit: 'piece',
-      category: '',
-      categoryId: '',
       barcode: '',
       taxRate: 0,
       isActive: true,
     },
   });
   
-  // Load categories
-  useEffect(() => {
-    // This useEffect is now removed as we're using RTK Query for categories
-  }, []);
-  
   // Set form values when product data is loaded
   useEffect(() => {
     if (product) {
-      // If we have both product and categories data available
-      if (categoriesData?.categories && product.categoryId) {
-        // Find the category by ID
-        const productCategory = categoriesData.categories.find(
-          cat => cat.id === product.categoryId
-        );
-        
-        // Use the category name from the categories list if found
-        const categoryName = productCategory ? productCategory.name : product.category;
-        
-        reset({
-          name: product.name,
-          quantity: product.quantity,
-          buyingPrice: product.buyingPrice,
-          sellingPrice: product.sellingPrice,
-          wholesalePrice: product.wholesalePrice,
-          discountPercentage: product.discountPercentage,
-          mrp: product.mrp,
-          unit: product.unit,
-          category: categoryName,
-          categoryId: product.categoryId || '',
-          barcode: product.barcode || '',
-          taxRate: product.taxRate,
-          isActive: product.isActive,
-        });
-      } else {
-        // If categories aren't loaded yet or product doesn't have a categoryId
-        reset({
-          name: product.name,
-          quantity: product.quantity,
-          buyingPrice: product.buyingPrice,
-          sellingPrice: product.sellingPrice,
-          wholesalePrice: product.wholesalePrice,
-          discountPercentage: product.discountPercentage,
-          mrp: product.mrp,
-          unit: product.unit,
-          category: product.category,
-          categoryId: product.categoryId || '',
-          barcode: product.barcode || '',
-          taxRate: product.taxRate,
-          isActive: product.isActive,
-        });
-      }
+      reset({
+        name: product.name,
+        quantity: product.quantity,
+        buyingPrice: product.buyingPrice,
+        sellingPrice: product.sellingPrice,
+        wholesalePrice: product.wholesalePrice,
+        discountPercentage: product.discountPercentage,
+        mrp: product.mrp,
+        unit: product.unit,
+        barcode: product.barcode || '',
+        taxRate: product.taxRate,
+        isActive: product.isActive,
+      });
     }
-  }, [product, categoriesData, reset]);
+  }, [product, reset]);
   
   // Form submission handler
   const onSubmit = async (data: any) => {
@@ -138,7 +95,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
       }).unwrap();
       
       // Navigate back to product detail page on success
-      router.push(`/dashboard/products/${productId}`);
+      router.push(`/products/${productId}`);
     } catch (error) {
       console.error('Error updating product:', error);
       alert('Failed to update product. Please try again.');
@@ -162,7 +119,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <p className="text-red-500">Error loading product. The product may have been deleted or doesn't exist.</p>
-            <Link href="/dashboard/products" className="mt-4 text-blue-600 hover:text-blue-800">
+            <Link href="/products" className="mt-4 text-blue-600 hover:text-blue-800">
               Return to Products
             </Link>
           </div>
@@ -176,7 +133,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Back button */}
         <div className="mb-6">
-          <Link href={`/dashboard/products/${productId}`} className="flex items-center text-blue-600 hover:text-blue-800">
+          <Link href={`/products/${productId}`} className="flex items-center text-blue-600 hover:text-blue-800">
             <ArrowLeftIcon className="h-4 w-4 mr-1" />
             Back to Product
           </Link>
@@ -214,62 +171,22 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
                     </div>
                   </div>
                   
-                  {/* Category and Unit */}
-                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                    <div>
-                      <label htmlFor="category" className="block text-sm font-medium text-gray-700">
-                        Category *
-                      </label>
-                      <div className="mt-1">
-                        <select
-                          id="category"
-                          {...register('category')}
-                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                          onChange={(e) => {
-                            // Find the selected category and update categoryId
-                            const selectedCategory = categoriesData?.categories?.find(
-                              (cat) => cat.name === e.target.value
-                            );
-                            if (selectedCategory) {
-                              setValue('categoryId', selectedCategory.id);
-                            } else {
-                              setValue('categoryId', '');
-                            }
-                          }}
-                        >
-                          <option value="">Select a category</option>
-                          {categoriesData?.categories && categoriesData.categories.map((category) => (
-                            <option key={category.id} value={category.name}>
-                              {category.name}
-                            </option>
-                          ))}
-                        </select>
-                        <input 
-                          type="hidden"
-                          {...register('categoryId')}
-                        />
-                        {errors.category && (
-                          <p className="mt-1 text-sm text-red-600">{errors.category.message}</p>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <label htmlFor="unit" className="block text-sm font-medium text-gray-700">
-                        Unit *
-                      </label>
-                      <div className="mt-1">
-                        <input
-                          type="text"
-                          id="unit"
-                          {...register('unit')}
-                          placeholder="e.g., piece, kg, box"
-                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                        />
-                        {errors.unit && (
-                          <p className="mt-1 text-sm text-red-600">{errors.unit.message}</p>
-                        )}
-                      </div>
+                  {/* Unit */}
+                  <div>
+                    <label htmlFor="unit" className="block text-sm font-medium text-gray-700">
+                      Unit *
+                    </label>
+                    <div className="mt-1">
+                      <input
+                        type="text"
+                        id="unit"
+                        {...register('unit')}
+                        placeholder="e.g., piece, kg, box"
+                        className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                      />
+                      {errors.unit && (
+                        <p className="mt-1 text-sm text-red-600">{errors.unit.message}</p>
+                      )}
                     </div>
                   </div>
                   
@@ -466,7 +383,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
                 
                 <div className="bg-gray-50 px-4 py-3 text-right sm:px-6">
                   <Link
-                    href={`/dashboard/products/${productId}`}
+                    href={`/products/${productId}`}
                     className="inline-flex justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 mr-3"
                   >
                     Cancel

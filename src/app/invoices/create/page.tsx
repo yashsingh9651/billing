@@ -26,21 +26,64 @@ const invoiceItemSchema = z.object({
   taxRate: z.coerce.number().min(0, 'Tax rate cannot be negative').max(100, 'Tax rate cannot exceed 100%').optional(),
 });
 
+// Create a dynamic schema based on invoice type
+const createInvoiceSchema = (type: 'BUYING' | 'SELLING') => {
+  const baseSchema = {
+    type: z.enum(['BUYING', 'SELLING']),
+    date: z.string().min(1, 'Date is required'),
+    items: z.array(invoiceItemSchema).min(1, 'At least one item is required'),
+    cgstRate: z.coerce.number().min(0, 'CGST rate cannot be negative').max(100, 'CGST rate cannot exceed 100%'),
+    sgstRate: z.coerce.number().min(0, 'SGST rate cannot be negative').max(100, 'SGST rate cannot exceed 100%'),
+    igstRate: z.coerce.number().min(0, 'IGST rate cannot be negative').max(100, 'IGST rate cannot exceed 100%'),
+    notes: z.string().optional(),
+  };
+
+  // For BUYING invoices, only sender details are required
+  if (type === 'BUYING') {
+    return z.object({
+      ...baseSchema,
+      senderName: z.string().min(1, 'Sender name is required'),
+      senderAddress: z.string().min(1, 'Sender address is required'),
+      senderGST: z.string().optional(),
+      senderContact: z.string().min(1, 'Sender contact is required'),
+      // Receiver details are optional as they'll be filled from session
+      receiverName: z.string().optional(),
+      receiverAddress: z.string().optional(),
+      receiverGST: z.string().optional(),
+      receiverContact: z.string().optional(),
+    });
+  }
+  
+  // For SELLING invoices, only receiver details are required
+  return z.object({
+    ...baseSchema,
+    // Sender details are optional as they'll be filled from session
+    senderName: z.string().optional(),
+    senderAddress: z.string().optional(),
+    senderGST: z.string().optional(),
+    senderContact: z.string().optional(),
+    receiverName: z.string().min(1, 'Receiver name is required'),
+    receiverAddress: z.string().min(1, 'Receiver address is required'),
+    receiverGST: z.string().optional(),
+    receiverContact: z.string().min(1, 'Receiver contact is required'),
+  });
+};
+
 const invoiceSchema = z.object({
   type: z.enum(['BUYING', 'SELLING']),
   date: z.string().min(1, 'Date is required'),
   
   // Sender info
-  senderName: z.string().min(1, 'Sender name is required'),
-  senderAddress: z.string().min(1, 'Sender address is required'),
+  senderName: z.string().optional(),
+  senderAddress: z.string().optional(),
   senderGST: z.string().optional(),
-  senderContact: z.string().min(1, 'Sender contact is required'),
+  senderContact: z.string().optional(),
   
   // Receiver info
-  receiverName: z.string().min(1, 'Receiver name is required'),
-  receiverAddress: z.string().min(1, 'Receiver address is required'),
+  receiverName: z.string().optional(),
+  receiverAddress: z.string().optional(),
   receiverGST: z.string().optional(),
-  receiverContact: z.string().min(1, 'Receiver contact is required'),
+  receiverContact: z.string().optional(),
   
   // Items
   items: z.array(invoiceItemSchema).min(1, 'At least one item is required'),
@@ -358,32 +401,57 @@ const CreateInvoicePage = () => {
     setIsSubmitting(true);
     
     try {
-      const invoiceData = {
-        ...data,
-        subtotal: subtotal,
-        gstAmount: taxTotal,
-        // We'll use these to calculate final amount in the API
-        cgstRate: data.cgstRate,
-        sgstRate: data.sgstRate,
-        igstRate: data.igstRate,
-        
-        // Add serial numbers to items
+      // Create the invoice data based on type
+      const invoiceType = data.type;
+      
+      // Base invoice data
+      const baseInvoiceData = {
+        type: invoiceType,
+        date: data.date,
         items: data.items.map((item, idx) => ({
           ...item,
           serialNumber: idx + 1,
           // Include the updated product pricing data for buying invoices
-          updateProductPricing: watchType === 'BUYING' && item.productId ? {
+          updateProductPricing: invoiceType === 'BUYING' && item.productId ? {
             mrp: item.mrp,
             sellingPrice: item.sellingPrice,
             wholesalePrice: item.wholesalePrice,
             taxRate: item.taxRate
           } : undefined
         })),
-        
-        // Add flag to update inventory for both buying and selling invoices
-        // This will be used by the API to automatically update inventory
-        updateInventory: true, // Enable for both types of invoices
+        cgstRate: data.cgstRate,
+        sgstRate: data.sgstRate,
+        igstRate: data.igstRate,
+        notes: data.notes,
+        updateInventory: true,
       };
+      
+      // Create invoice data object based on type
+      let invoiceData: any = { ...baseInvoiceData };
+      
+      if (invoiceType === 'BUYING') {
+        // For buying invoices, only send supplier (sender) details
+        // Do NOT send receiver details to backend
+        invoiceData = {
+          ...invoiceData,
+          senderName: data.senderName,
+          senderAddress: data.senderAddress,
+          senderGST: data.senderGST,
+          senderContact: data.senderContact,
+          // Receiver data is handled automatically by the backend based on the session user
+        };
+      } else {
+        // For selling invoices, only send customer (receiver) details
+        // Do NOT send sender details to backend
+        invoiceData = {
+          ...invoiceData,
+          receiverName: data.receiverName,
+          receiverAddress: data.receiverAddress,
+          receiverGST: data.receiverGST,
+          receiverContact: data.receiverContact,
+          // Sender data is handled automatically by the backend based on the session user
+        };
+      }
       
       console.log('Form data:', invoiceData);
       
@@ -391,7 +459,7 @@ const CreateInvoicePage = () => {
       try {
         const result = await createInvoice(invoiceData).unwrap();
         console.log('Invoice created successfully:', result);
-        router.push(`/dashboard/invoices/${result.id}`);
+        router.push(`/invoices/${result.id}`);
       } catch (error: any) {
         console.error('API Error:', error);
         // Extract detailed error information
@@ -465,177 +533,169 @@ const CreateInvoicePage = () => {
           </div>
         </div>
 
-        {/* Sender Information */}
-        <div>
-          <h2 className="text-base font-semibold leading-7 text-gray-900">
-            {watchType === 'BUYING' ? 'Supplier Information' : 'Your Business Information'}
-          </h2>
-          <p className="mt-1 text-sm leading-6 text-gray-600">
-            {watchType === 'BUYING' 
-              ? 'Enter the supplier details for this purchase.' 
-              : 'Your business details will be used as the sender.'}
-          </p>
+        {/* Sender Information - Only show for BUYING invoice type */}
+        {watchType === 'BUYING' && (
+          <div>
+            <h2 className="text-base font-semibold leading-7 text-gray-900">
+              Supplier Information
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-gray-600">
+              Enter the supplier details for this purchase.
+            </p>
 
-          <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-6">
-            <div className="sm:col-span-3">
-              <label htmlFor="senderName" className="block text-sm font-medium leading-6 text-gray-900">
-                Business Name
-              </label>
-              <div className="mt-2">
-                <input
-                  type="text"
-                  id="senderName"
-                  {...register('senderName')}
-                  className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                  readOnly={watchType === 'SELLING'}
-                />
-                {errors.senderName && (
-                  <p className="mt-2 text-sm text-red-600">{errors.senderName.message}</p>
-                )}
+            <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-6">
+              <div className="sm:col-span-3">
+                <label htmlFor="senderName" className="block text-sm font-medium leading-6 text-gray-900">
+                  Business Name
+                </label>
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    id="senderName"
+                    {...register('senderName')}
+                    className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                  />
+                  {errors.senderName && (
+                    <p className="mt-2 text-sm text-red-600">{errors.senderName.message}</p>
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div className="sm:col-span-3">
-              <label htmlFor="senderContact" className="block text-sm font-medium leading-6 text-gray-900">
-                Contact
-              </label>
-              <div className="mt-2">
-                <input
-                  type="text"
-                  id="senderContact"
-                  {...register('senderContact')}
-                  className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                  readOnly={watchType === 'SELLING'}
-                />
-                {errors.senderContact && (
-                  <p className="mt-2 text-sm text-red-600">{errors.senderContact.message}</p>
-                )}
+              <div className="sm:col-span-3">
+                <label htmlFor="senderContact" className="block text-sm font-medium leading-6 text-gray-900">
+                  Contact
+                </label>
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    id="senderContact"
+                    {...register('senderContact')}
+                    className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                  />
+                  {errors.senderContact && (
+                    <p className="mt-2 text-sm text-red-600">{errors.senderContact.message}</p>
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div className="sm:col-span-4">
-              <label htmlFor="senderAddress" className="block text-sm font-medium leading-6 text-gray-900">
-                Address
-              </label>
-              <div className="mt-2">
-                <input
-                  type="text"
-                  id="senderAddress"
-                  {...register('senderAddress')}
-                  className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                  readOnly={watchType === 'SELLING'}
-                />
-                {errors.senderAddress && (
-                  <p className="mt-2 text-sm text-red-600">{errors.senderAddress.message}</p>
-                )}
+              <div className="sm:col-span-4">
+                <label htmlFor="senderAddress" className="block text-sm font-medium leading-6 text-gray-900">
+                  Address
+                </label>
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    id="senderAddress"
+                    {...register('senderAddress')}
+                    className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                  />
+                  {errors.senderAddress && (
+                    <p className="mt-2 text-sm text-red-600">{errors.senderAddress.message}</p>
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div className="sm:col-span-2">
-              <label htmlFor="senderGST" className="block text-sm font-medium leading-6 text-gray-900">
-                GST Number
-              </label>
-              <div className="mt-2">
-                <input
-                  type="text"
-                  id="senderGST"
-                  {...register('senderGST')}
-                  className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                  readOnly={watchType === 'SELLING'}
-                />
-                {errors.senderGST && (
-                  <p className="mt-2 text-sm text-red-600">{errors.senderGST.message}</p>
-                )}
+              <div className="sm:col-span-2">
+                <label htmlFor="senderGST" className="block text-sm font-medium leading-6 text-gray-900">
+                  GST Number
+                </label>
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    id="senderGST"
+                    {...register('senderGST')}
+                    className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                  />
+                  {errors.senderGST && (
+                    <p className="mt-2 text-sm text-red-600">{errors.senderGST.message}</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Receiver Information */}
-        <div>
-          <h2 className="text-base font-semibold leading-7 text-gray-900">
-            {watchType === 'BUYING' ? 'Your Business Information' : 'Customer Information'}
-          </h2>
-          <p className="mt-1 text-sm leading-6 text-gray-600">
-            {watchType === 'BUYING' 
-              ? 'Your business details will be used as the receiver.' 
-              : 'Enter the customer details for this sale.'}
-          </p>
+        {/* Receiver Information - Only show for SELLING invoice type */}
+        {watchType === 'SELLING' && (
+          <div>
+            <h2 className="text-base font-semibold leading-7 text-gray-900">
+              Customer Information
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-gray-600">
+              Enter the customer details for this sale.
+            </p>
 
-          <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-6">
-            <div className="sm:col-span-3">
-              <label htmlFor="receiverName" className="block text-sm font-medium leading-6 text-gray-900">
-                Business Name
-              </label>
-              <div className="mt-2">
-                <input
-                  type="text"
-                  id="receiverName"
-                  {...register('receiverName')}
-                  className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                  readOnly={watchType === 'BUYING'}
-                />
-                {errors.receiverName && (
-                  <p className="mt-2 text-sm text-red-600">{errors.receiverName.message}</p>
-                )}
+            <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-6">
+              <div className="sm:col-span-3">
+                <label htmlFor="receiverName" className="block text-sm font-medium leading-6 text-gray-900">
+                  Business Name
+                </label>
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    id="receiverName"
+                    {...register('receiverName')}
+                    className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                  />
+                  {errors.receiverName && (
+                    <p className="mt-2 text-sm text-red-600">{errors.receiverName.message}</p>
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div className="sm:col-span-3">
-              <label htmlFor="receiverContact" className="block text-sm font-medium leading-6 text-gray-900">
-                Contact
-              </label>
-              <div className="mt-2">
-                <input
-                  type="text"
-                  id="receiverContact"
-                  {...register('receiverContact')}
-                  className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                  readOnly={watchType === 'BUYING'}
-                />
-                {errors.receiverContact && (
-                  <p className="mt-2 text-sm text-red-600">{errors.receiverContact.message}</p>
-                )}
+              <div className="sm:col-span-3">
+                <label htmlFor="receiverContact" className="block text-sm font-medium leading-6 text-gray-900">
+                  Contact
+                </label>
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    id="receiverContact"
+                    {...register('receiverContact')}
+                    className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                  />
+                  {errors.receiverContact && (
+                    <p className="mt-2 text-sm text-red-600">{errors.receiverContact.message}</p>
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div className="sm:col-span-4">
-              <label htmlFor="receiverAddress" className="block text-sm font-medium leading-6 text-gray-900">
-                Address
-              </label>
-              <div className="mt-2">
-                <input
-                  type="text"
-                  id="receiverAddress"
-                  {...register('receiverAddress')}
-                  className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                  readOnly={watchType === 'BUYING'}
-                />
-                {errors.receiverAddress && (
-                  <p className="mt-2 text-sm text-red-600">{errors.receiverAddress.message}</p>
-                )}
+              <div className="sm:col-span-4">
+                <label htmlFor="receiverAddress" className="block text-sm font-medium leading-6 text-gray-900">
+                  Address
+                </label>
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    id="receiverAddress"
+                    {...register('receiverAddress')}
+                    className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                  />
+                  {errors.receiverAddress && (
+                    <p className="mt-2 text-sm text-red-600">{errors.receiverAddress.message}</p>
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div className="sm:col-span-2">
-              <label htmlFor="receiverGST" className="block text-sm font-medium leading-6 text-gray-900">
-                GST Number
-              </label>
-              <div className="mt-2">
-                <input
-                  type="text"
-                  id="receiverGST"
-                  {...register('receiverGST')}
-                  className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                  readOnly={watchType === 'BUYING'}
-                />
-                {errors.receiverGST && (
-                  <p className="mt-2 text-sm text-red-600">{errors.receiverGST.message}</p>
-                )}
+              <div className="sm:col-span-2">
+                <label htmlFor="receiverGST" className="block text-sm font-medium leading-6 text-gray-900">
+                  GST Number
+                </label>
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    id="receiverGST"
+                    {...register('receiverGST')}
+                    className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                  />
+                  {errors.receiverGST && (
+                    <p className="mt-2 text-sm text-red-600">{errors.receiverGST.message}</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Invoice Items */}
         <div>
@@ -949,12 +1009,37 @@ const CreateInvoicePage = () => {
                 {formatCurrency(subtotal)}
               </dd>
             </div>
+            
+            <div className="px-4 py-2 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+              <dt className="text-sm font-medium leading-6 text-gray-900">CGST ({watchCgstRate}%)</dt>
+              <dd className="mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0">
+                {formatCurrency((subtotal * watchCgstRate) / 100)}
+              </dd>
+            </div>
+            
+            <div className="px-4 py-2 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+              <dt className="text-sm font-medium leading-6 text-gray-900">SGST ({watchSgstRate}%)</dt>
+              <dd className="mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0">
+                {formatCurrency((subtotal * watchSgstRate) / 100)}
+              </dd>
+            </div>
+            
+            {watchIgstRate > 0 && (
+              <div className="px-4 py-2 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+                <dt className="text-sm font-medium leading-6 text-gray-900">IGST ({watchIgstRate}%)</dt>
+                <dd className="mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0">
+                  {formatCurrency((subtotal * watchIgstRate) / 100)}
+                </dd>
+              </div>
+            )}
+            
             <div className="px-4 py-2 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
               <dt className="text-sm font-medium leading-6 text-gray-900">Tax Amount</dt>
               <dd className="mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0">
                 {formatCurrency(taxTotal)}
               </dd>
             </div>
+            
             <div className="px-4 py-2 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
               <dt className="text-sm font-medium leading-6 text-gray-900">Total Amount</dt>
               <dd className="mt-1 text-sm font-semibold leading-6 text-gray-900 sm:col-span-2 sm:mt-0">
