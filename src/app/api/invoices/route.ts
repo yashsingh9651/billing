@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     console.log('Received data:', data);
     
     // Validate required fields based on invoice type
-    let requiredFields = ['type', 'items'];
+    let requiredFields = ['type'];
     
     if (data.type === 'BUYING') {
       // For buying invoices, only sender details are required (receiver is the user)
@@ -77,24 +77,31 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
     
-    // Validate items array
-    if (!Array.isArray(data.items) || data.items.length === 0) {
+    // Initialize items array if not provided
+    if (!data.items) {
+      data.items = [];
+    }
+    
+    // Validate items array is an array
+    if (!Array.isArray(data.items)) {
       return NextResponse.json({
         error: 'Failed to create invoice',
-        details: 'At least one item is required'
+        details: 'Items must be an array'
       }, { status: 400 });
     }
     
-    // Validate each item has required fields
-    const requiredItemFields = ['productId', 'productName', 'quantity', 'rate', 'amount'];
-    for (let i = 0; i < data.items.length; i++) {
-      const item = data.items[i];
-      const missingItemFields = requiredItemFields.filter(field => item[field] === undefined);
-      if (missingItemFields.length > 0) {
-        return NextResponse.json({
-          error: 'Failed to create invoice',
-          details: `Item at index ${i} is missing required fields: ${missingItemFields.join(', ')}`
-        }, { status: 400 });
+    // Validate each item has required fields (only if items exist)
+    if (data.items.length > 0) {
+      const requiredItemFields = ['productId', 'productName', 'quantity', 'rate', 'amount'];
+      for (let i = 0; i < data.items.length; i++) {
+        const item = data.items[i];
+        const missingItemFields = requiredItemFields.filter(field => item[field] === undefined);
+        if (missingItemFields.length > 0) {
+          return NextResponse.json({
+            error: 'Failed to create invoice',
+            details: `Item at index ${i} is missing required fields: ${missingItemFields.join(', ')}`
+          }, { status: 400 });
+        }
       }
     }
     
@@ -119,7 +126,9 @@ export async function POST(req: NextRequest) {
     const invoiceNumber = `${prefix}-${nextNumber.toString().padStart(3, '0')}`;
     
     // Calculate totals
-    const subtotal = data.items.reduce((sum: number, item: any) => sum + item.amount, 0);
+    const subtotal = data.items.length > 0 
+      ? data.items.reduce((sum: number, item: any) => sum + item.amount, 0)
+      : 0;
     
     // Use tax rates from the frontend
     const cgstRate = data.cgstRate !== undefined ? data.cgstRate : 0;
@@ -128,17 +137,19 @@ export async function POST(req: NextRequest) {
     
     // Create the invoice and its items
     try {
-      // First, verify that all products exist
-      for (const item of data.items) {
-        const product = await prisma.product.findUnique({
-          where: { id: item.productId }
-        });
-        
-        if (!product) {
-          return NextResponse.json({ 
-            error: 'Failed to create invoice', 
-            details: `Product with ID ${item.productId} not found` 
-          }, { status: 400 });
+      // First, verify that all products exist (if there are items)
+      if (data.items.length > 0) {
+        for (const item of data.items) {
+          const product = await prisma.product.findUnique({
+            where: { id: item.productId }
+          });
+          
+          if (!product) {
+            return NextResponse.json({ 
+              error: 'Failed to create invoice', 
+              details: `Product with ID ${item.productId} not found` 
+            }, { status: 400 });
+          }
         }
       }
       
@@ -168,18 +179,21 @@ export async function POST(req: NextRequest) {
         
         userId: session.user.id,
         
-        items: {
-          create: data.items.map((item: any, index: number) => ({
-            serialNumber: index + 1,
-            productName: item.productName,
-            quantity: item.quantity,
-            rate: item.rate,
-            discount: item.discount || 0,
-            amount: item.amount,
-            productId: item.productId,
-            hsnCode: item.hsnCode || null,
-          })),
-        },
+        // Create items only if there are any
+        ...(data.items.length > 0 ? {
+          items: {
+            create: data.items.map((item: any, index: number) => ({
+              serialNumber: index + 1,
+              productName: item.productName,
+              quantity: item.quantity,
+              rate: item.rate,
+              discount: item.discount || 0,
+              amount: item.amount,
+              productId: item.productId,
+              hsnCode: item.hsnCode || null,
+            })),
+          }
+        } : {}),
       },
       include: {
         items: true,
@@ -189,8 +203,8 @@ export async function POST(req: NextRequest) {
     // Update product inventory quantities based on invoice type
     let inventoryUpdateResult = null;
     
-    // Handle inventory updates if requested
-    if (data.updateInventory !== false) {
+    // Handle inventory updates if requested and if there are items
+    if (data.updateInventory !== false && data.items.length > 0) {
       if (data.type === 'BUYING') {
         // For buying invoices, increase inventory
         inventoryUpdateResult = await updateInventoryFromBuyingInvoice(invoice.id);

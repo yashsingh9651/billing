@@ -13,10 +13,10 @@ import { formatCurrency, calculateAmount } from '@/lib/utils';
 
 // Schema for form validation
 const invoiceItemSchema = z.object({
-  productId: z.string().min(1, 'Product is required'),
-  productName: z.string().min(1, 'Product name is required'),
-  quantity: z.coerce.number().positive('Quantity must be greater than 0'),
-  rate: z.coerce.number().positive('Rate must be greater than 0'),
+  productId: z.string().min(0, 'Product is required'),
+  productName: z.string().min(0, 'Product name is required'),
+  quantity: z.coerce.number().min(0, 'Quantity must be greater than 0'),
+  rate: z.coerce.number().min(0,'Rate must be greater than 0'),
   discount: z.coerce.number().min(0, 'Discount cannot be negative').max(100, 'Discount cannot be more than 100%'),
   amount: z.coerce.number().min(0, 'Amount must be 0 or greater'),
   hsnCode: z.string().optional(),
@@ -44,7 +44,7 @@ const invoiceSchema = z.object({
   receiverContact: z.string().min(1, 'Receiver contact is required'),
   
   // Items
-  items: z.array(invoiceItemSchema).min(1, 'At least one item is required'),
+  items: z.array(invoiceItemSchema).min(0, 'At least one item is required'),
   
   // Tax rates
   cgstRate: z.coerce.number().min(0, 'CGST rate cannot be negative').max(100, 'CGST rate cannot exceed 100%'),
@@ -121,20 +121,7 @@ const CreateInvoicePage = () => {
       receiverAddress: businessDetails.address || '',
       receiverGST: businessDetails.gst || '',
       receiverContact: businessDetails.contact || '',
-      items: [
-        {
-          productId: '',
-          productName: '',
-          quantity: 1,
-          rate: 0,
-          discount: 0,
-          hsnCode: '',
-          amount: 0,
-          mrp: 0,
-          sellingPrice: 0,
-          wholesalePrice: 0,
-        },
-      ],
+      items: [],
       cgstRate: 0,
       sgstRate: 0,
       igstRate: 0,
@@ -434,15 +421,6 @@ const CreateInvoicePage = () => {
       console.log('Form submission started with data:', data);
       setIsSubmitting(true);
       setFormError(null); // Clear any previous errors
-      
-      // Verify that all items have valid product IDs
-      for (const item of data.items) {
-        if (!item.productId) {
-          setFormError('All items must have a product selected.');
-          setIsSubmitting(false);
-          return;
-        }
-      }
       
       // Create the invoice data based on type
       const invoiceType = data.type;
@@ -784,21 +762,27 @@ const CreateInvoicePage = () => {
         <div>
           <h2 className="text-base font-semibold leading-7 text-gray-900">Invoice Items</h2>
           <p className="mt-1 text-sm leading-6 text-gray-600">
-            Add one or more items to the invoice.
+            Add items to the invoice or create an empty invoice without items.
           </p>
 
           <div className="mt-4 flow-root">
             <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
               <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
-                <table className="min-w-full divide-y divide-gray-300">
-                  <thead>
-                    <tr>
-                      <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-0">
-                        Product
-                      </th>
-                      <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                        Quantity
-                      </th>
+                {fields.length === 0 ? (
+                  <div className="bg-gray-50 py-6 px-4 rounded-md text-center">
+                    <p className="text-gray-500">No items added to this invoice.</p>
+                    <p className="text-sm text-gray-400 mt-1">Click "Add Item" to add products or submit the form to create an empty invoice.</p>
+                  </div>
+                ) : (
+                  <table className="min-w-full divide-y divide-gray-300">
+                    <thead>
+                      <tr>
+                        <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-0">
+                          Product
+                        </th>
+                        <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                          Quantity
+                        </th>
                       <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
                         Rate
                       </th>
@@ -1017,19 +1001,10 @@ const CreateInvoicePage = () => {
                       </tr>
                     ))}
                     <tr>
-                      <td colSpan={10} className="px-3 py-4 text-center">
-                        <button
-                          type="button"
-                          onClick={addItem}
-                          className="inline-flex items-center rounded-md bg-indigo-100 px-3 py-2 text-sm font-semibold text-indigo-700 shadow-sm hover:bg-indigo-200"
-                        >
-                          <PlusIcon className="-ml-0.5 mr-1.5 h-4 w-4" aria-hidden="true" />
-                          Add Another Item
-                        </button>
-                      </td>
                     </tr>
                   </tbody>
                 </table>
+                )}
                 
                 <div className="mt-4">
                   <button
@@ -1040,6 +1015,22 @@ const CreateInvoicePage = () => {
                     <PlusIcon className="-ml-0.5 mr-1.5 h-5 w-5" aria-hidden="true" />
                     Add Item
                   </button>
+                  
+                  {fields.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Remove all items
+                        while (fields.length > 0) {
+                          remove(0);
+                        }
+                      }}
+                      className="ml-3 inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+                    >
+                      <TrashIcon className="-ml-0.5 mr-1.5 h-5 w-5" aria-hidden="true" />
+                      Remove All
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
