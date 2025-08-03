@@ -16,8 +16,6 @@ interface Product {
   sellingPrice: number;
   wholesalePrice: number;
   unit: string;
-  isActive: boolean;
-  supplier: string;
   barcode?: string;
   mrp: number;
 }
@@ -46,8 +44,7 @@ export default function ProductsPage() {
     // Filter by search query
     const matchesSearch = 
       searchQuery === '' || 
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (product.supplier?.toLowerCase() || '').includes(searchQuery.toLowerCase());
+      product.name.toLowerCase().includes(searchQuery.toLowerCase())
     
     // Filter by low stock (quantity <= 5)
     const matchesLowStock = filter !== 'low-stock' || (product.quantity <= 5 && product.isActive);
@@ -157,7 +154,7 @@ export default function ProductsPage() {
                         Selling Price
                       </th>
                       <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                        Status
+                        Wholesale Price
                       </th>
                       <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
                         <span className="sr-only">Actions</span>
@@ -175,15 +172,7 @@ export default function ProductsPage() {
                         </td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">₹ {product.buyingPrice.toFixed(2)}</td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">₹ {product.sellingPrice.toFixed(2)}</td>
-                        <td className="whitespace-nowrap px-3 py-4 text-sm">
-                          <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${
-                            product.isActive 
-                              ? 'bg-green-50 text-green-700 ring-1 ring-inset ring-green-600/20' 
-                              : 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20'
-                          }`}>
-                            {product.isActive ? 'Active' : 'Inactive'}
-                          </span>
-                        </td>
+                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">₹ {product.wholesalePrice.toFixed(2)}</td>
                         <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                           <Link href={`/products/${product.id}`} className="text-blue-600 hover:text-blue-900 mr-4">
                             View

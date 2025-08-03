@@ -11,7 +11,6 @@ import {
 } from "@/redux/services/invoiceApiSlice";
 import { formatCurrency } from "@/lib/utils";
 import jsPDF from "jspdf";
-import QRCode from "qrcode";
 import { useSession } from "next-auth/react";
 
 // Function to format date
@@ -186,20 +185,6 @@ export default function InvoiceDetailsPage() {
         roundOffAmount: 0,
       };
 
-  // Generate QR Code
-  const generateQRCode = async (data: string): Promise<string> => {
-    try {
-      return await QRCode.toDataURL(data, {
-        width: 100,
-        margin: 1,
-        color: { dark: "#000000", light: "#FFFFFF" },
-      });
-    } catch (error) {
-      console.error("Error generating QR code:", error);
-      return "";
-    }
-  };
-
   // Handle download PDF with Indian GST format
   const handleDownloadPdf = async () => {
     setIsPdfGenerating(true);
@@ -218,7 +203,6 @@ export default function InvoiceDetailsPage() {
 
       // Generate QR Code
       const qrData = `Invoice: ${invoice.invoiceNumber}, Date: ${invoice.date}, Amount: ${taxAmounts.totalAmount}, GSTIN: ${invoice.senderGST}`;
-      const qrCodeDataUrl = await generateQRCode(qrData);
 
       // Header - Tax Invoice
       pdf.setFontSize(16);
@@ -229,21 +213,7 @@ export default function InvoiceDetailsPage() {
 
       // e-Invoice label
       pdf.text("e-Invoice", pageWidth - margin - 25, margin + 10);
-
-      // Add QR Code
-      if (qrCodeDataUrl) {
-        pdf.addImage(
-          qrCodeDataUrl,
-          "PNG",
-          pageWidth - margin - 25,
-          margin + 15,
-          20,
-          20
-        );
-      }
-
       let yPos = margin + 25;
-
       // Invoice Details - Simplified header to match web UI
       pdf.setFontSize(8);
       pdf.setFont("helvetica", "bold");
@@ -324,14 +294,13 @@ export default function InvoiceDetailsPage() {
       const tableHeaders = [
         "Sl",
         "Description of Goods",
-        "HSN/SAC",
         "Quantity",
         "Rate",
         "Per",
         "Disc %",
         "Amount",
       ];
-      const colWidths = [15, 60, 25, 20, 20, 15, 15, 30];
+      const colWidths = [15, 85, 20, 20, 15, 15, 30];
 
       // Table header
       pdf.setFillColor(240, 240, 240);
@@ -363,20 +332,17 @@ export default function InvoiceDetailsPage() {
         pdf.text(item.productName, xPos + 1, yPos + 5);
         xPos += colWidths[1];
 
-        pdf.text(item.hsnCode || "69101000", xPos + 1, yPos + 5);
+        pdf.text(`${item.quantity} PCS`, xPos + 1, yPos + 5);
         xPos += colWidths[2];
 
-        pdf.text(`${item.quantity} PCS`, xPos + 1, yPos + 5);
+        pdf.text(item.rate.toFixed(2), xPos + 1, yPos + 5);
         xPos += colWidths[3];
 
-        pdf.text(item.rate.toFixed(2), xPos + 1, yPos + 5);
+        pdf.text("PCS", xPos + 1, yPos + 5);
         xPos += colWidths[4];
 
-        pdf.text("PCS", xPos + 1, yPos + 5);
-        xPos += colWidths[5];
-
         pdf.text(`${item.discount}%`, xPos + 1, yPos + 5);
-        xPos += colWidths[6];
+        xPos += colWidths[5];
 
         // Format currency directly for PDF to avoid special characters
         pdf.text(
@@ -416,11 +382,11 @@ export default function InvoiceDetailsPage() {
 
       // Only draw vertical line for rate column
       xPos = margin;
-      for (let i = 0; i < 6; i++) xPos += colWidths[i];
+      for (let i = 0; i < 5; i++) xPos += colWidths[i];
       pdf.text(`${invoice.cgstRate || 0}%`, xPos + 1, yPos + 5);
 
       // Only draw amount at the right position
-      xPos += colWidths[6];
+      xPos += colWidths[5];
       pdf.text(
         cgstAmount.toLocaleString("en-IN", {
           maximumFractionDigits: 2,
@@ -445,11 +411,11 @@ export default function InvoiceDetailsPage() {
 
       // Only draw vertical line for rate column
       xPos = margin;
-      for (let i = 0; i < 6; i++) xPos += colWidths[i];
+      for (let i = 0; i < 5; i++) xPos += colWidths[i];
       pdf.text(`${invoice.sgstRate || 0}%`, xPos + 1, yPos + 5);
 
       // Only draw amount at the right position
-      xPos += colWidths[6];
+      xPos += colWidths[5];
       pdf.text(
         sgstAmount.toLocaleString("en-IN", {
           maximumFractionDigits: 2,
@@ -475,11 +441,11 @@ export default function InvoiceDetailsPage() {
 
         // Only draw vertical line for rate column
         xPos = margin;
-        for (let i = 0; i < 6; i++) xPos += colWidths[i];
+        for (let i = 0; i < 5; i++) xPos += colWidths[i];
         pdf.text(`${invoice.igstRate || 0}%`, xPos + 1, yPos + 5);
 
         // Only draw amount at the right position
-        xPos += colWidths[6];
+        xPos += colWidths[5];
         pdf.text(
           igstAmount.toLocaleString("en-IN", {
             maximumFractionDigits: 2,
@@ -492,9 +458,9 @@ export default function InvoiceDetailsPage() {
         // Draw only the vertical borders for the rate column and right edge, plus bottom border
         pdf.line(margin, yPos, margin, yPos + 8); // Left edge
         xPos = margin;
-        for (let i = 0; i < 6; i++) xPos += colWidths[i];
+        for (let i = 0; i < 5; i++) xPos += colWidths[i];
         pdf.line(xPos, yPos, xPos, yPos + 8); // Before rate
-        xPos += colWidths[6];
+        xPos += colWidths[5];
         pdf.line(xPos, yPos, xPos, yPos + 8); // Right edge
         pdf.line(margin, yPos + 8, margin + contentWidth, yPos + 8); // Bottom line
         yPos += 8;
@@ -531,7 +497,7 @@ export default function InvoiceDetailsPage() {
 
       // Only draw amount at the right position
       xPos = margin;
-      for (let i = 0; i < 7; i++) xPos += colWidths[i];
+      for (let i = 0; i < 6; i++) xPos += colWidths[i];
       pdf.text(
         `Rs ${taxAmounts.totalAmount.toLocaleString("en-IN", {
           maximumFractionDigits: 2,
@@ -565,7 +531,6 @@ export default function InvoiceDetailsPage() {
       // Tax breakdown table
       pdf.setFontSize(7);
       const taxTableHeaders = [
-        "HSN/SAC",
         "Taxable Value",
         "Central Tax Rate",
         "Amount",
@@ -573,7 +538,7 @@ export default function InvoiceDetailsPage() {
         "Amount",
         "Total Tax Amount",
       ];
-      const taxColWidths = [25, 30, 25, 25, 25, 25, 35];
+      const taxColWidths = [35, 30, 25, 30, 25, 45];
 
       // Tax table header
       pdf.setFillColor(240, 240, 240);
@@ -592,8 +557,6 @@ export default function InvoiceDetailsPage() {
 
       // Tax table data row
       xPos = margin;
-      pdf.text(invoice.defaultHsnCode || "69101000", xPos + 1, yPos + 5);
-      xPos += taxColWidths[0];
       // Format currency directly for PDF
       pdf.text(
         invoice.subtotal.toLocaleString("en-IN", {
@@ -653,7 +616,6 @@ export default function InvoiceDetailsPage() {
       pdf.setFont("helvetica", "bold");
       xPos = margin;
       pdf.text("Total", xPos + 1, yPos + 5);
-      xPos += taxColWidths[0];
       // Format currency directly for PDF
       pdf.text(
         invoice.subtotal.toLocaleString("en-IN", {
@@ -715,41 +677,37 @@ export default function InvoiceDetailsPage() {
 
       yPos += 15;
 
-      // Company Bank Details and Declaration - Added to match web UI
-      pdf.setFontSize(8);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Company's Bank Details", margin, yPos);
-
-      pdf.setFont("helvetica", "normal");
-      pdf.text("Bank Name: UCO BANK", margin, yPos + 5);
-      pdf.text("A/c No.: XXXXXXXXXX", margin, yPos + 10);
-      pdf.text("Branch & IFS Code: MAHOBA CHARKHARI 0316", margin, yPos + 15);
-
-      pdf.text("Company's PAN: AAACR1234C", margin, yPos + 25);
-
-      // Declaration
-      pdf.text("Declaration:", margin, yPos + 35);
-      pdf.setFontSize(7);
-      pdf.text(
-        "We declare that this invoice shows the actual price of the goods",
-        margin,
-        yPos + 40
-      );
-      pdf.text(
-        "described and that all particulars are true and correct.",
-        margin,
-        yPos + 44
-      );
-
-      // Signature section
-      pdf.setFontSize(8);
-      pdf.text(`for ${invoice.senderName}`, margin + 120, yPos);
-
-      // Signature box
-      pdf.rect(margin + 120, yPos + 5, 24, 16);
-      pdf.text("Authorised Signatory", margin + 120, yPos + 25);
-      pdf.text("Name:", margin + 120, yPos + 30);
-      pdf.text("Designation:", margin + 120, yPos + 35);
+      // Company Bank Details and Declaration - Only show for SELLING invoices
+      if (invoice.type === "SELLING") {
+        pdf.setFontSize(8);
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Company's Bank Details", margin, yPos);
+        pdf.setFont("helvetica", "normal");
+        pdf.text("Bank Name: H.D.F.C. BANK, BRANCH KARWI", margin, yPos + 5);
+        pdf.text("A/c No.: 50200015143525", margin, yPos + 10);
+        pdf.text("Branch & IFS Code: HDFC0002656", margin, yPos + 15);
+        pdf.text("Company's PAN: AAACR1234C", margin, yPos + 25);
+        pdf.text("Declaration:", margin, yPos + 35);
+        pdf.setFontSize(7);
+        pdf.text(
+          "We declare that this invoice shows the actual price of the goods",
+          margin,
+          yPos + 40
+        );
+        pdf.text(
+          "described and that all particulars are true and correct.",
+          margin,
+          yPos + 44
+        );
+        // Signature section
+        pdf.setFontSize(8);
+        pdf.text(`for ${invoice.senderName}`, margin + 120, yPos);
+        // Signature box
+        pdf.rect(margin + 120, yPos + 5, 24, 16);
+        pdf.text("Authorised Signatory", margin + 120, yPos + 25);
+        pdf.text("Name:", margin + 120, yPos + 30);
+        pdf.text("Designation:", margin + 120, yPos + 35);
+      }
 
       // Footer
       pdf.setFontSize(7);
@@ -803,15 +761,9 @@ export default function InvoiceDetailsPage() {
             >
               <ArrowLeftIcon className="h-5 w-5" aria-hidden="true" />
             </button>
-            <div>
-              <h1 className="text-2xl font-semibold leading-7 text-gray-900">
-                Tax Invoice #{invoice.invoiceNumber}
-              </h1>
-              <p className="mt-1 text-sm leading-6 text-gray-600">
-                {formatDate(invoice.date)} •{" "}
-                <StatusBadge status={invoice.status} />
-              </p>
-            </div>
+            <h1 className="text-2xl font-semibold leading-7 text-gray-900">
+              Tax Invoice #{invoice.invoiceNumber}
+            </h1>
           </div>
           <div className="mt-4 flex gap-3 sm:mt-0">
             <button
@@ -842,9 +794,6 @@ export default function InvoiceDetailsPage() {
             </div>
             <div className="text-right">
               <div className="text-sm font-semibold mb-2">e-Invoice</div>
-              <div className="w-20 h-20 bg-gray-200 border border-gray-400 flex items-center justify-center">
-                <span className="text-xs text-gray-500">QR Code</span>
-              </div>
             </div>
           </div>
 
@@ -905,9 +854,6 @@ export default function InvoiceDetailsPage() {
                     Description of Goods
                   </th>
                   <th className="border-r border-gray-400 px-2 py-2 text-center font-medium text-gray-900">
-                    HSN/SAC
-                  </th>
-                  <th className="border-r border-gray-400 px-2 py-2 text-center font-medium text-gray-900">
                     Quantity
                   </th>
                   <th className="border-r border-gray-400 px-2 py-2 text-center font-medium text-gray-900">
@@ -937,9 +883,6 @@ export default function InvoiceDetailsPage() {
                       {item.productName}
                     </td>
                     <td className="border-r border-gray-300 px-2 py-2 text-center">
-                      {item.hsnCode || "69101000"}
-                    </td>
-                    <td className="border-r border-gray-300 px-2 py-2 text-center">
                       {item.quantity} PCS
                     </td>
                     <td className="border-r border-gray-300 px-2 py-2 text-center">
@@ -959,7 +902,7 @@ export default function InvoiceDetailsPage() {
 
                 {/* Tax Summary Rows */}
                 <tr className="border-b border-gray-300">
-                  <td colSpan={6} className="px-2 pl-4 py-2 font-medium">
+                  <td colSpan={5} className="px-2 pl-4 py-2 font-medium">
                     Output CGST
                   </td>
                   <td className="border-r border-gray-300 px-2 py-2 text-center">
@@ -970,7 +913,7 @@ export default function InvoiceDetailsPage() {
                   </td>
                 </tr>
                 <tr className="border-b border-gray-300">
-                  <td colSpan={6} className="px-2 pl-4 py-2 font-medium">
+                  <td colSpan={5} className="px-2 pl-4 py-2 font-medium">
                     Output SGST
                   </td>
                   <td className="border-r border-gray-300 px-2 py-2 text-center">
@@ -982,7 +925,7 @@ export default function InvoiceDetailsPage() {
                 </tr>
                 {taxAmounts.igst > 0 && (
                   <tr className="border-b border-gray-300">
-                    <td colSpan={6} className="px-2 pl-4 py-2 font-medium">
+                    <td colSpan={5} className="px-2 pl-4 py-2 font-medium">
                       Output IGST
                     </td>
                     <td className="border-r border-gray-300 px-2 py-2 text-center">
@@ -994,7 +937,7 @@ export default function InvoiceDetailsPage() {
                   </tr>
                 )}
                 <tr className="border-b border-gray-300">
-                  <td colSpan={7} className="px-2 pl-4 py-2 font-medium">
+                  <td colSpan={6} className="px-2 pl-4 py-2 font-medium">
                     ROUND OFF
                   </td>
                   <td className="px-2 py-2 pr-4 text-right">
@@ -1003,22 +946,22 @@ export default function InvoiceDetailsPage() {
                 </tr>
                 {/* Add 5 empty rows for spacing between roundoff and total */}
                 <tr className="h-6">
-                  <td colSpan={8}></td>
+                  <td colSpan={7}></td>
                 </tr>
                 <tr className="h-6">
-                  <td colSpan={8}></td>
+                  <td colSpan={7}></td>
                 </tr>
                 <tr className="h-6">
-                  <td colSpan={8}></td>
+                  <td colSpan={7}></td>
                 </tr>
                 <tr className="h-6">
-                  <td colSpan={8}></td>
+                  <td colSpan={7}></td>
                 </tr>
                 <tr className="h-6">
-                  <td colSpan={8}></td>
+                  <td colSpan={7}></td>
                 </tr>
                 <tr className="border-b-2 border-gray-900">
-                  <td colSpan={7} className="px-2 pl-4 py-2 font-bold">
+                  <td colSpan={6} className="px-2 pl-4 py-2 font-bold">
                     Total
                   </td>
                   <td className="px-2 py-2 pr-4 text-right font-bold">
@@ -1044,9 +987,6 @@ export default function InvoiceDetailsPage() {
             <table className="min-w-full text-xs border border-gray-300">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="border border-gray-300 px-2 py-1 text-left">
-                    HSN/SAC
-                  </th>
                   <th className="border border-gray-300 px-2 py-1 text-center">
                     Taxable Value
                   </th>
@@ -1069,9 +1009,6 @@ export default function InvoiceDetailsPage() {
               </thead>
               <tbody>
                 <tr>
-                  <td className="border border-gray-300 px-2 py-1">
-                    {invoice.defaultHsnCode || "69101000"}
-                  </td>
                   <td className="border border-gray-300 px-2 py-1 text-center">
                     {formatCurrency(invoice.subtotal)}
                   </td>
@@ -1092,7 +1029,6 @@ export default function InvoiceDetailsPage() {
                   </td>
                 </tr>
                 <tr className="font-bold">
-                  <td className="border border-gray-300 px-2 py-1">Total</td>
                   <td className="border border-gray-300 px-2 py-1 text-center">
                     {formatCurrency(invoice.subtotal)}
                   </td>
@@ -1124,50 +1060,53 @@ export default function InvoiceDetailsPage() {
 
           {/* Footer Section */}
           <div className="px-4 py-4">
-            <div className="grid grid-cols-2 gap-8">
-              <div className="space-y-3">
-                <p className="text-sm">
-                  <span className="font-medium">Company's Bank Details</span>
-                </p>
-                <p className="text-sm">
-                  <span className="font-medium">Bank Name:</span> UCO BANK
-                </p>
-                <p className="text-sm">
-                  <span className="font-medium">A/c No.:</span> XXXXXXXXXX
-                </p>
-                <p className="text-sm">
-                  <span className="font-medium">Branch & IFS Code:</span> MAHOBA
-                  CHARKHARI 0316
-                </p>
-                <div className="mt-4">
+            {invoice.type === "SELLING" && (
+              <div className="grid grid-cols-2 gap-8">
+                <div className="space-y-3">
                   <p className="text-sm">
-                    <span className="font-medium">Company's PAN:</span>{" "}
-                    AAACR1234C
+                    <span className="font-semibold">
+                      Company's Bank Details
+                    </span>
                   </p>
-                </div>
-                <div className="mt-4">
-                  <p className="text-sm font-medium">Declaration:</p>
-                  <p className="text-xs text-gray-600 mt-1">
-                    We declare that this invoice shows the actual price
-                    <br />
-                    of the goods described and that all particulars are
-                    <br />
-                    true and correct.
+                  <p className="text-sm">
+                    <span className="font-semibold">
+                      Bank Name: H.D.F.C. BANK, BRANCH KARWI
+                    </span>
                   </p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-sm">for {invoice.senderName}</p>
-                <div className="mt-8 mb-2">
-                  <div className="w-24 h-16 border border-gray-400 ml-auto flex items-center justify-center">
-                    <span className="text-xs text-gray-500">Signature</span>
+                  <p className="text-sm">
+                    <span className="font-semibold">
+                      A/c No.: 50200015143525
+                    </span>
+                  </p>
+                  <p className="text-sm">
+                    <span className="font-semibold">
+                      Branch & IFS Code: HDFC0002656
+                    </span>{" "}
+                  </p>
+                  <div className="mt-4">
+                    <p className="text-sm font-semibold">Declaration:</p>
+                    <p className="text-xs text-gray-600 mt-1">
+                      We declare that this invoice shows the actual price
+                      <br />
+                      of the goods described and that all particulars are
+                      <br />
+                      true and correct.
+                    </p>
                   </div>
                 </div>
-                <p className="text-sm">Authorised Signatory</p>
-                <p className="text-sm">Name:</p>
-                <p className="text-sm">Designation:</p>
+
+                <div className="text-right">
+                  <p className="text-sm font-semibold">{invoice.senderName}</p>
+                  <div className="mt-8 mb-2">
+                    <div className="w-24 h-16 border border-gray-400 ml-auto flex items-center justify-center">
+                      <span className="text-xs text-gray-500">Signature</span>
+                    </div>
+                  </div>
+                  <p className="text-sm">Authorised Signatory</p>
+                  <p className="text-sm">Name: Akanksha Interprises</p>
+                </div>
               </div>
-            </div>
+            )}
             <div className="mt-6 text-center">
               <p className="text-xs text-gray-500">
                 This is a Computer Generated Invoice

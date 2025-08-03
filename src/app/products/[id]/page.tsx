@@ -132,22 +132,22 @@ export default function ProductDetailPage() {
               
               <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
                 <dt className="text-sm font-medium text-gray-500">Buying Price</dt>
-                <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">${product.buyingPrice.toFixed(2)}</dd>
+                <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">₹{product.buyingPrice.toFixed(2)}</dd>
               </div>
               
               <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
                 <dt className="text-sm font-medium text-gray-500">Selling Price</dt>
-                <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">${product.sellingPrice.toFixed(2)}</dd>
+                <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">₹{product.sellingPrice.toFixed(2)}</dd>
               </div>
               
               <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
                 <dt className="text-sm font-medium text-gray-500">Wholesale Price</dt>
-                <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">${product.wholesalePrice.toFixed(2)}</dd>
+                <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">₹{product.wholesalePrice.toFixed(2)}</dd>
               </div>
               
               <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
                 <dt className="text-sm font-medium text-gray-500">MRP</dt>
-                <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">${product.mrp.toFixed(2)}</dd>
+                <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">₹{product.mrp.toFixed(2)}</dd>
               </div>
               
               <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
