@@ -16,7 +16,6 @@ export async function GET(req: NextRequest) {
     
     const searchParams = req.nextUrl.searchParams;
     const type = searchParams.get('type');
-    const status = searchParams.get('status');
     
     // Build the query with filters
     const where: any = {
@@ -25,10 +24,6 @@ export async function GET(req: NextRequest) {
     
     if (type) {
       where.type = type;
-    }
-    
-    if (status) {
-      where.status = status;
     }
     
     const invoices = await prisma.invoice.findMany({
@@ -169,8 +164,6 @@ export async function POST(req: NextRequest) {
         cgstRate,
         sgstRate,
         igstRate,
-        
-        status: 'DRAFT',
         notes: data.notes,
         
         userId: session.user.id,

@@ -73,9 +73,6 @@ model Invoice {
   cgstRate          Float    @default(0)
   sgstRate          Float    @default(0)
   igstRate          Float    @default(0)
-  
-  // Status and metadata
-  status            InvoiceStatus @default(DRAFT)
   notes             String?
   
   // Relations

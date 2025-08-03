@@ -187,7 +187,6 @@ const CreateInvoicePage = () => {
           Number(item.rate) || 0,
           Number(item.discount) || 0
         );
-        
         // Only update if amount has changed to avoid infinite loop
         if (item.amount !== amount) {
           setValue(`items.${index}.amount`, amount);
@@ -240,7 +239,6 @@ const CreateInvoicePage = () => {
             
             // Only update if amount has actually changed to avoid loops
             if (Number(item.amount) !== amount) {
-              console.log(`Auto-updating amount for item ${index}:`, amount);
               setValue(`items.${index}.amount`, amount);
             }
           }
@@ -284,9 +282,6 @@ const CreateInvoicePage = () => {
     
     const product = productsData.products.find(p => p.id === productId);
     if (!product) return;
-    
-    console.log('Selected product:', product);
-    
     // Get current values
     const currentQty = getValues(`items.${index}.quantity`) || 1;
     const rate = watchType === 'BUYING' ? product.buyingPrice : product.sellingPrice;
@@ -339,18 +334,12 @@ const CreateInvoicePage = () => {
   };
 
   // Handle quantity or rate change
-  const handleItemCalculation = (index: number) => {
-    console.log('Recalculating item amount for index:', index);
-    
+  const handleItemCalculation = (index: number) => {    
     // Get the latest values directly
     const item = getValues(`items.${index}`);
     const quantity = Number(item.quantity) || 0;
     const rate = Number(item.rate) || 0;
-    const discount = Number(item.discount) || 0;
-    
-    console.log('Raw item values:', item);
-    console.log('Parsed values:', { quantity, rate, discount });
-    
+    const discount = Number(item.discount) || 0;    
     // Check if quantity exceeds available stock for SELLING invoices
     if (watchType === 'SELLING' && item.productId) {
       const product = productsData?.products?.find(p => p.id === item.productId);
@@ -370,15 +359,11 @@ const CreateInvoicePage = () => {
     }
     
     // Calculate the new amount
-    const amount = calculateAmount(quantity, rate, discount);
-    console.log('Calculated amount:', amount);
-    
+    const amount = calculateAmount(quantity, rate, discount);   
     // Update the amount in the form
     setValue(`items.${index}.amount`, amount);
-    
     // Force recalculation of totals
     recalculateTotals();
-    
     // Update the entire item to ensure changes are reflected
     const updatedItem = {
       ...item,
@@ -393,11 +378,6 @@ const CreateInvoicePage = () => {
       const mrp = getValues(`items.${index}.mrp`);
       const sellingPrice = getValues(`items.${index}.sellingPrice`);
       const wholesalePrice = getValues(`items.${index}.wholesalePrice`);
-      
-      // Log the updated values for debugging
-      console.log(`Product ${productId} pricing updated:`, {
-        mrp, sellingPrice, wholesalePrice
-      });
     }
     
     // Manually trigger a recalculation of totals
@@ -412,7 +392,6 @@ const CreateInvoicePage = () => {
     const cgstRate = parseFloat(getValues('cgstRate')?.toString() || '0');
     const sgstRate = parseFloat(getValues('sgstRate')?.toString() || '0');
     const igstRate = parseFloat(getValues('igstRate')?.toString() || '0');
-    
     const cgstAmount = (newSubtotal * cgstRate) / 100;
     const sgstAmount = (newSubtotal * sgstRate) / 100;
     const igstAmount = (newSubtotal * igstRate) / 100;
@@ -516,13 +495,9 @@ const CreateInvoicePage = () => {
           // Sender data is handled automatically by the backend based on the session user
         };
       }
-      
-      console.log('Processed form data for API call:', invoiceData);
-      
       // Submit the form
       try {
         const result = await createInvoice(invoiceData).unwrap();
-        console.log('Invoice created successfully:', result);
         router.push(`/invoices/${result.id}`);
       } catch (error: any) {
         console.error('API Error:', error);
@@ -536,12 +511,9 @@ const CreateInvoicePage = () => {
         } else if (error.message) {
           errorMessage = error.message;
         }
-        
         setFormError(errorMessage);
-        console.error('Error details:', error);
       }
     } catch (error: any) {
-      console.error('Form processing error:', error);
       setFormError('An unexpected error occurred. Please check your form data and try again.');
     } finally {
       setIsSubmitting(false);

@@ -214,8 +214,6 @@ export async function PUT(
           cgstRate: data.cgstRate !== undefined ? data.cgstRate : 0,
           sgstRate: data.sgstRate !== undefined ? data.sgstRate : 0,
           igstRate: data.igstRate !== undefined ? data.igstRate : 0,
-
-          status: data.status || undefined,
           notes: data.notes || undefined,
 
           items: {
@@ -251,7 +249,6 @@ export async function PUT(
         },
         data: {
           date: data.date || undefined,
-          status: data.status || undefined,
           notes: data.notes || undefined,
         },
         include: {

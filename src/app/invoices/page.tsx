@@ -42,43 +42,6 @@ const invoiceTypeFilters = [
   { id: 'SELLING', name: 'Selling' },
 ];
 
-// Invoice status options for filtering
-const statusOptions = [
-  { id: 'all', name: 'All Statuses' },
-  { id: 'DRAFT', name: 'Draft' },
-  { id: 'FINALIZED', name: 'Finalized' },
-  { id: 'PAID', name: 'Paid' },
-  { id: 'CANCELLED', name: 'Cancelled' },
-];
-
-// Invoice status component with appropriate colors
-const InvoiceStatusBadge = ({ status }: { status: string }) => {
-  let colorClass = '';
-
-  switch (status) {
-    case 'PAID':
-      colorClass = 'bg-green-100 text-green-800';
-      break;
-    case 'FINALIZED':
-      colorClass = 'bg-blue-100 text-blue-800';
-      break;
-    case 'DRAFT':
-      colorClass = 'bg-yellow-100 text-yellow-800';
-      break;
-    case 'CANCELLED':
-      colorClass = 'bg-red-100 text-red-800';
-      break;
-    default:
-      colorClass = 'bg-gray-100 text-gray-800';
-  }
-
-  return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${colorClass}`}>
-      {status}
-    </span>
-  );
-};
-
 export default function InvoicesPage() {
   const router = useRouter();
   const [selectedTypeFilter, setSelectedTypeFilter] = useState('all');
@@ -98,7 +61,7 @@ export default function InvoicesPage() {
     }
     
     // Filter by status
-    if (selectedStatusFilter !== 'all' && invoice.status !== selectedStatusFilter) {
+    if (selectedStatusFilter !== 'all' ) {
       return false;
     }
     
@@ -223,19 +186,6 @@ export default function InvoicesPage() {
               </button>
             ))}
           </div>
-
-          {/* Status Filter */}
-          <select
-            className="rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm"
-            value={selectedStatusFilter}
-            onChange={(e) => setSelectedStatusFilter(e.target.value)}
-          >
-            {statusOptions.map(option => (
-              <option key={option.id} value={option.id}>
-                {option.name}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
 
@@ -279,9 +229,6 @@ export default function InvoicesPage() {
                       <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
                         Amount
                       </th>
-                      <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                        Status
-                      </th>
                       <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
                         <span className="sr-only">Actions</span>
                       </th>
@@ -318,9 +265,6 @@ export default function InvoicesPage() {
                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                           {formatCurrency(calculateInvoiceTotal(invoice))}
                         </td>
-                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                          <InvoiceStatusBadge status={invoice.status} />
-                        </td>
                         <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                           <div className="flex items-center justify-end space-x-3">
                             <Link
@@ -337,13 +281,6 @@ export default function InvoicesPage() {
                             >
                               <PencilIcon className="h-5 w-5" aria-hidden="true" />
                             </Link>
-                            <button
-                              onClick={() => handleDownloadPdf(invoice.id)}
-                              className="text-indigo-600 hover:text-indigo-900"
-                              title="Download PDF"
-                            >
-                              <DocumentArrowDownIcon className="h-5 w-5" aria-hidden="true" />
-                            </button>
                             <button
                               onClick={() => handleDelete(invoice.id)}
                               disabled={isDeleting}

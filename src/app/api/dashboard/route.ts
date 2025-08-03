@@ -59,7 +59,6 @@ export async function GET() {
       where: {
         userId: session.user.id,
         type: "SELLING",
-        status: "PAID",
         date: { gte: firstDayCurrentMonth }
       },
       _sum: {
@@ -72,7 +71,6 @@ export async function GET() {
       where: {
         userId: session.user.id,
         type: "SELLING",
-        status: "PAID",
         date: { 
           gte: firstDayPreviousMonth,
           lt: firstDayCurrentMonth
@@ -100,7 +98,6 @@ export async function GET() {
       where: {
         userId: session.user.id,
         type: "BUYING",
-        status: "PAID",
         date: { gte: firstDayCurrentMonth }
       },
       _sum: {
@@ -113,7 +110,6 @@ export async function GET() {
       where: {
         userId: session.user.id,
         type: "BUYING",
-        status: "PAID",
         date: { 
           gte: firstDayPreviousMonth,
           lt: firstDayCurrentMonth
