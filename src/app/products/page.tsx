@@ -1,12 +1,11 @@
 'use client';
-
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { PlusIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, MagnifyingGlassIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 // Import the API hooks from productApiSlice
-import { productApiSlice } from '@/redux/services/productApiSlice';
+import { productApiSlice, useDeleteProductMutation } from '@/redux/services/productApiSlice';
 
 interface Product {
   id: string;
@@ -23,9 +22,14 @@ interface Product {
 export default function ProductsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const filter = searchParams.get('filter');
+  const filter = searchParams.get("filter");
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [productToDelete, setProductToDelete] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   
-  const [searchQuery, setSearchQuery] = useState('');
+  // Delete product mutation
+  const [deleteProduct, { isLoading: isDeleting }] = useDeleteProductMutation();
 
   // Use the RTK Query hook to fetch products
   const { 
@@ -47,18 +51,42 @@ export default function ProductsPage() {
       product.name.toLowerCase().includes(searchQuery.toLowerCase())
     
     // Filter by low stock (quantity <= 5)
-    const matchesLowStock = filter !== 'low-stock' || (product.quantity <= 5 && product.isActive);
+    const matchesLowStock = filter !== 'low-stock' || (product.quantity <= 5);
     
-    // Filter active only if not specifically viewing low stock
-    const isActiveMatch = filter === 'low-stock' || product.isActive;
-    
-    return matchesSearch && matchesLowStock && isActiveMatch;
+    return matchesSearch && matchesLowStock;
   });
 
   // Handle search input change
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
-  };  return (
+  };
+  
+  // Handle delete button click
+  const handleDeleteClick = (productId: string) => {
+    setProductToDelete(productId);
+    setShowDeleteConfirm(true);
+  };
+  
+  // Handle delete confirmation
+  const handleConfirmDelete = async () => {
+    if (productToDelete) {
+      try {
+        await deleteProduct(productToDelete).unwrap();
+        setShowDeleteConfirm(false);
+        setProductToDelete(null);
+      } catch (error) {
+        console.error('Failed to delete product', error);
+      }
+    }
+  };
+  
+  // Handle cancel delete
+  const handleCancelDelete = () => {
+    setShowDeleteConfirm(false);
+    setProductToDelete(null);
+  };
+
+  return (
     <div className="px-4 sm:px-6 lg:px-8">
       <div className="sm:flex sm:items-center">
         <div className="sm:flex-auto">
@@ -177,9 +205,15 @@ export default function ProductsPage() {
                           <Link href={`/products/${product.id}`} className="text-blue-600 hover:text-blue-900 mr-4">
                             View
                           </Link>
-                          <Link href={`/products/${product.id}/edit`} className="text-blue-600 hover:text-blue-900">
+                          <Link href={`/products/${product.id}/edit`} className="text-blue-600 hover:text-blue-900 mr-4">
                             Edit
                           </Link>
+                          <button
+                            onClick={() => handleDeleteClick(product.id)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            Delete
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -197,6 +231,34 @@ export default function ProductsPage() {
           </div>
         </div>
       </div>
+      
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Confirm Delete</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete this product? This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={handleCancelDelete}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

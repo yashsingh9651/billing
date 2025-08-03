@@ -13,7 +13,6 @@ export interface Product {
   barcode?: string;
   supplier?: string;
   description?: string;
-  isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -30,7 +29,6 @@ export interface ProductCreateInput {
   barcode?: string;
   supplier?: string;
   description?: string;
-  isActive?: boolean;
 }
 
 export interface ProductUpdateInput extends Partial<ProductCreateInput> {

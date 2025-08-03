@@ -42,7 +42,6 @@ const productSchema = z.object({
     .refine((val) => val >= 0, { message: 'MRP cannot be negative' }),
   unit: z.string().min(1, 'Unit is required'),
   barcode: z.string().optional(),
-  isActive: z.boolean(),
 });
 
 // Use z.infer to get the proper types
@@ -71,7 +70,6 @@ export default function AddProductPage() {
       mrp: 0,
       unit: 'piece',
       barcode: '',
-      isActive: true,
     },
   });
 
@@ -300,17 +298,7 @@ export default function AddProductPage() {
               </div>
 
               <div className="sm:col-span-6">
-                <div className="flex items-center mt-4">
-                  <input
-                    id="isActive"
-                    type="checkbox"
-                    {...register('isActive')}
-                    className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600"
-                  />
-                  <label htmlFor="isActive" className="ml-2 block text-sm text-gray-900">
-                    Product is active and available for sale
-                  </label>
-                </div>
+                {/* Active checkbox removed */}
               </div>
             </div>
           </div>

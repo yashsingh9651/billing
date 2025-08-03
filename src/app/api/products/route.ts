@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { auth } from '@/app/auth';
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { auth } from "@/app/auth";
 
 // GET /api/products - Get all products
 export async function GET(request: NextRequest) {
@@ -8,27 +8,28 @@ export async function GET(request: NextRequest) {
     // Check authentication
     const session = await auth();
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Get query parameters for filtering/pagination if needed
     const searchParams = request.nextUrl.searchParams;
-    const isActive = searchParams.get('isActive');
-    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : undefined;
-    const page = searchParams.get('page') ? parseInt(searchParams.get('page')!) : undefined;
+    const limit = searchParams.get("limit")
+      ? parseInt(searchParams.get("limit")!)
+      : undefined;
+    const page = searchParams.get("page")
+      ? parseInt(searchParams.get("page")!)
+      : undefined;
     const skip = page && limit ? (page - 1) * limit : undefined;
 
     // Build where condition based on query params
     const where: any = {};
-    if (isActive !== null) where.isActive = isActive === 'true';
 
     // Get products with pagination and filtering
     const products = await prisma.product.findMany({
-      where,
       take: limit,
       skip,
       orderBy: {
-        updatedAt: 'desc',
+        updatedAt: "desc",
       },
     });
 
@@ -43,9 +44,9 @@ export async function GET(request: NextRequest) {
       totalPages: limit ? Math.ceil(totalCount / limit) : 1,
     });
   } catch (error) {
-    console.error('Error fetching products:', error);
+    console.error("Error fetching products:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch products' },
+      { error: "Failed to fetch products" },
       { status: 500 }
     );
   }
@@ -57,18 +58,23 @@ export async function POST(request: NextRequest) {
     // Check authentication
     const session = await auth();
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Get product data from request body
     const body = await request.json();
-    
+
     // Validate required fields
     const requiredFields = [
-      'name', 'quantity', 'buyingPrice', 'sellingPrice', 'wholesalePrice',
-      'mrp', 'unit'
+      "name",
+      "quantity",
+      "buyingPrice",
+      "sellingPrice",
+      "wholesalePrice",
+      "mrp",
+      "unit",
     ];
-    
+
     for (const field of requiredFields) {
       if (body[field] === undefined) {
         return NextResponse.json(
@@ -79,10 +85,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Ensure numeric values are parsed as numbers
-    const numericFields = ['quantity', 'buyingPrice', 'sellingPrice', 'wholesalePrice', 
-                          'discountPercentage', 'mrp'];
-    
-    numericFields.forEach(field => {
+    const numericFields = [
+      "quantity",
+      "buyingPrice",
+      "sellingPrice",
+      "wholesalePrice",
+      "discountPercentage",
+      "mrp",
+    ];
+
+    numericFields.forEach((field) => {
       if (body[field] !== undefined) {
         body[field] = parseFloat(body[field]);
       }
@@ -105,9 +117,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(product, { status: 201 });
   } catch (error) {
-    console.error('Error creating product:', error);
+    console.error("Error creating product:", error);
     return NextResponse.json(
-      { error: 'Failed to create product' },
+      { error: "Failed to create product" },
       { status: 500 }
     );
   }
