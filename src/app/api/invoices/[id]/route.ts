@@ -3,8 +3,8 @@ import { auth } from "@/app/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(
-  req: NextRequest,
-  context: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: { id: string } }
 ) {
   try {
     const session = await auth();
@@ -13,7 +13,7 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = await context.params;
+    const { id } = params;
 
     const invoice = await prisma.invoice.findUnique({
       where: {

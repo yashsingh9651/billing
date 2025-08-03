@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/app/auth';
 
+type RouteSegmentProps = {
+  params: {
+    id: string;
+  };
+};
+
 // GET /api/products/[id] - Get a specific product by ID
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: RouteSegmentProps
 ) {
   try {
     // Check authentication
@@ -14,7 +20,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id } = await context.params;
+    const { id } = params;
     if (!id) {
       return NextResponse.json({ error: 'Product ID is required' }, { status: 400 });
     }
@@ -41,7 +47,7 @@ export async function GET(
 // PUT /api/products/[id] - Update a specific product
 export async function PUT(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: RouteSegmentProps
 ) {
   try {
     // Check authentication
@@ -50,7 +56,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id } = await context.params;
+    const { id } = params;
     if (!id) {
       return NextResponse.json({ error: 'Product ID is required' }, { status: 400 });
     }
@@ -106,7 +112,7 @@ export async function PUT(
 // DELETE /api/products/[id] - Delete a specific product
 export async function DELETE(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: RouteSegmentProps
 ) {
   try {
     // Check authentication
@@ -115,7 +121,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id } = await context.params;
+    const { id } = params;
     if (!id) {
       return NextResponse.json({ error: 'Product ID is required' }, { status: 400 });
     }

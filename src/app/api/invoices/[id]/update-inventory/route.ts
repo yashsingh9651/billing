@@ -6,10 +6,16 @@ import {
   updateInventoryFromSellingInvoice 
 } from '@/lib/inventory-utils';
 
+type RouteSegmentProps = {
+  params: {
+    id: string;
+  };
+};
+
 // PUT /api/invoices/[id]/update-inventory - Update inventory for an invoice
 export async function PUT(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: RouteSegmentProps
 ) {
   try {
     // Check authentication
@@ -18,7 +24,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id } = await context.params;
+    const { id } = params;
     if (!id) {
       return NextResponse.json({ error: 'Invoice ID is required' }, { status: 400 });
     }
