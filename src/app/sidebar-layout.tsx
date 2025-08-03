@@ -11,7 +11,6 @@ import {
   UserIcon,
   CogIcon,
 } from "@heroicons/react/24/outline";
-import { ChevronDownIcon } from "@heroicons/react/20/solid";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
@@ -45,8 +44,7 @@ export default function SidebarLayout({
   };
 
   const session = useSession();
-const user = session.data?.user;
-
+  const user = session.data?.user;
 
   return (
     <div>
@@ -180,18 +178,6 @@ const user = session.data?.user;
                           ))}
                         </ul>
                       </li>
-                      <li className="mt-auto">
-                        <Link
-                          href="/settings"
-                          className="group -mx-2 flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-                        >
-                          <CogIcon
-                            className="h-6 w-6 shrink-0 text-gray-400 group-hover:text-blue-600"
-                            aria-hidden="true"
-                          />
-                          Settings
-                        </Link>
-                      </li>
                     </ul>
                   </nav>
                 </div>
@@ -279,18 +265,6 @@ const user = session.data?.user;
                   ))}
                 </ul>
               </li>
-              <li className="mt-auto">
-                <Link
-                  href="/settings"
-                  className="group -mx-2 flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 text-gray-700 hover:bg-blue-50 hover:text-blue-600"
-                >
-                  <CogIcon
-                    className="h-6 w-6 shrink-0 text-gray-400 group-hover:text-blue-600"
-                    aria-hidden="true"
-                  />
-                  Settings
-                </Link>
-              </li>
             </ul>
           </nav>
         </div>
@@ -307,13 +281,22 @@ const user = session.data?.user;
             <Bars3Icon className="h-6 w-6" aria-hidden="true" />
           </button>
           <div className="flex justify-between w-full items-center">
-            <h4>Welcome, {user?.name }</h4>
-            <button
-              onClick={handleSignOut}
-              className="px-5 py-2 text-sm font-semibold bg-blue-500 rounded-2xl duration-200 text-gray-900 hover:bg-blue-50 hover:text-blue-600"
-            >
-              Log out
-            </button>
+            <h4>Welcome, {user?.name}</h4>
+            {session.status === "authenticated" ? (
+              <button
+                onClick={handleSignOut}
+                className="px-5 py-2 text-sm font-semibold bg-blue-500 rounded-2xl duration-200 text-gray-900 hover:bg-blue-50 hover:text-blue-600"
+              >
+                Log out
+              </button>
+            ) : (
+              <Link
+                href="/login"
+                className="px-5 py-2 text-sm font-semibold bg-blue-500 rounded-2xl duration-200 text-gray-900 hover:bg-blue-50 hover:text-blue-600"
+              >
+                Log in
+              </Link>
+            )}
           </div>
         </div>
 

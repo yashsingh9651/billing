@@ -629,7 +629,7 @@ const CreateInvoicePage = () => {
                     type="text"
                     id="senderName"
                     {...register('senderName')}
-                    className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                    className="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                   />
                   {errors.senderName && (
                     <p className="mt-2 text-sm text-red-600">{errors.senderName.message}</p>
@@ -646,7 +646,7 @@ const CreateInvoicePage = () => {
                     type="text"
                     id="senderContact"
                     {...register('senderContact')}
-                    className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                    className="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                   />
                   {errors.senderContact && (
                     <p className="mt-2 text-sm text-red-600">{errors.senderContact.message}</p>
@@ -663,7 +663,7 @@ const CreateInvoicePage = () => {
                     type="text"
                     id="senderAddress"
                     {...register('senderAddress')}
-                    className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                    className="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                   />
                   {errors.senderAddress && (
                     <p className="mt-2 text-sm text-red-600">{errors.senderAddress.message}</p>
@@ -681,7 +681,7 @@ const CreateInvoicePage = () => {
                     id="senderGST"
                     {...register('senderGST')}
                     defaultValue=""
-                    className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                    className="block w-full uppercase rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                   />
                   {errors.senderGST && (
                     <p className="mt-2 text-sm text-red-600">{errors.senderGST.message}</p>
@@ -712,7 +712,7 @@ const CreateInvoicePage = () => {
                     type="text"
                     id="receiverName"
                     {...register('receiverName')}
-                    className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                    className="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                   />
                   {errors.receiverName && (
                     <p className="mt-2 text-sm text-red-600">{errors.receiverName.message}</p>
@@ -764,7 +764,7 @@ const CreateInvoicePage = () => {
                     id="receiverGST"
                     {...register('receiverGST')}
                     defaultValue=""
-                    className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                    className="block uppercase w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                   />
                   {errors.receiverGST && (
                     <p className="mt-2 text-sm text-red-600">{errors.receiverGST.message}</p>
@@ -865,7 +865,7 @@ const CreateInvoicePage = () => {
                             type="number"
                             {...register(`items.${index}.quantity`)}
                             onChange={(e) => {
-                              const value = parseInt(e.target.value);
+                              const value = Number(e.target.value);
                               setValue(`items.${index}.quantity`, value);
                               handleItemCalculation(index);
                             }}
@@ -887,7 +887,7 @@ const CreateInvoicePage = () => {
                             type="number"
                             {...register(`items.${index}.rate`)}
                             onChange={(e) => {
-                              const value = parseInt(e.target.value);
+                              const value = Number(e.target.value);
                               setValue(`items.${index}.rate`, value);
                               handleItemCalculation(index);
                             }}
@@ -904,7 +904,7 @@ const CreateInvoicePage = () => {
                             type="number"
                             {...register(`items.${index}.discount`)}
                             onChange={(e) => {
-                              const value = parseInt(e.target.value);
+                              const value = Number(e.target.value);
                               setValue(`items.${index}.discount`, value);
                               handleItemCalculation(index);
                             }}
@@ -931,7 +931,7 @@ const CreateInvoicePage = () => {
                               type="number"
                               {...register(`items.${index}.mrp`)}
                               onChange={(e) => {
-                                const value = parseInt(e.target.value);
+                                const value = Number(e.target.value);
                                 setValue(`items.${index}.mrp`, value);
                               }}
                               className="block w-24 rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
@@ -946,7 +946,7 @@ const CreateInvoicePage = () => {
                               type="number"
                               {...register(`items.${index}.sellingPrice`)}
                               onChange={(e) => {
-                                const value = parseInt(e.target.value);
+                                const value = Number(e.target.value);
                                 setValue(`items.${index}.sellingPrice`, value);
                               }}
                               className="block w-24 rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
@@ -960,7 +960,7 @@ const CreateInvoicePage = () => {
                               type="number"
                               {...register(`items.${index}.wholesalePrice`)}
                               onChange={(e) => {
-                                const value = parseInt(e.target.value);
+                                const value = Number(e.target.value);
                                 setValue(`items.${index}.wholesalePrice`, value);
                               }}
                               className="block w-24 rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
@@ -976,7 +976,7 @@ const CreateInvoicePage = () => {
                                 type="number"
                                 {...register(`items.${index}.wholesalePrice`)}
                                 onChange={(e) => {
-                                  const value = parseInt(e.target.value);
+                                  const value = Number(e.target.value);
                                   setValue(`items.${index}.wholesalePrice`, value);
                                 }}
                                 className="block w-24 rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
