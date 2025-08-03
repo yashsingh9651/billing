@@ -42,11 +42,6 @@ const productSchema = z.object({
     .refine((val) => val >= 0, { message: 'MRP cannot be negative' }),
   unit: z.string().min(1, 'Unit is required'),
   barcode: z.string().optional(),
-  taxRate: z
-    .union([z.string(), z.number()])
-    .transform((val) => (val === '' ? 0 : Number(val)))
-    .refine((val) => !isNaN(val), { message: 'Must be a number' })
-    .refine((val) => val >= 0, { message: 'Tax rate cannot be negative' }),
   isActive: z.boolean(),
 });
 
@@ -76,7 +71,6 @@ export default function AddProductPage() {
       mrp: 0,
       unit: 'piece',
       barcode: '',
-      taxRate: 0,
       isActive: true,
     },
   });
@@ -301,25 +295,6 @@ export default function AddProductPage() {
                   />
                   {errors.discountPercentage && (
                     <p className="mt-2 text-sm text-red-600">{errors.discountPercentage.message}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="sm:col-span-2">
-                <label htmlFor="taxRate" className="block text-sm font-medium leading-6 text-gray-900">
-                  Tax Rate (%)
-                </label>
-                <div className="mt-2">
-                  <input
-                    type="number"
-                    id="taxRate"
-                    min="0"
-                    step="1"
-                    {...register('taxRate')}
-                    className="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                  />
-                  {errors.taxRate && (
-                    <p className="mt-2 text-sm text-red-600">{errors.taxRate.message}</p>
                   )}
                 </div>
               </div>

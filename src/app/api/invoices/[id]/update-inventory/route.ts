@@ -9,7 +9,7 @@ import {
 // PUT /api/invoices/[id]/update-inventory - Update inventory for an invoice
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
     // Check authentication
@@ -18,7 +18,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const id = params.id;
+    const { id } = await context.params;
     if (!id) {
       return NextResponse.json({ error: 'Invoice ID is required' }, { status: 400 });
     }

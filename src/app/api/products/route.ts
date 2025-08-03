@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     // Validate required fields
     const requiredFields = [
       'name', 'quantity', 'buyingPrice', 'sellingPrice', 'wholesalePrice',
-      'mrp', 'unit', 'taxRate'
+      'mrp', 'unit'
     ];
     
     for (const field of requiredFields) {
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
 
     // Ensure numeric values are parsed as numbers
     const numericFields = ['quantity', 'buyingPrice', 'sellingPrice', 'wholesalePrice', 
-                          'discountPercentage', 'mrp', 'taxRate'];
+                          'discountPercentage', 'mrp'];
     
     numericFields.forEach(field => {
       if (body[field] !== undefined) {
@@ -100,10 +100,6 @@ export async function POST(request: NextRequest) {
         mrp: body.mrp,
         unit: body.unit,
         barcode: body.barcode,
-        supplier: body.supplier,
-        taxRate: body.taxRate,
-        description: body.description,
-        isActive: body.isActive !== undefined ? body.isActive : true,
       } as any,
     });
 

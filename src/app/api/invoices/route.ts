@@ -200,6 +200,21 @@ export async function POST(req: NextRequest) {
       if (data.type === 'BUYING') {
         // For buying invoices, increase inventory
         inventoryUpdateResult = await updateInventoryFromBuyingInvoice(invoice.id);
+        
+        // Also update product pricing information if provided
+        for (const item of data.items) {
+          if (item.updateProductPricing && item.productId) {
+            // Update the product pricing information
+            await prisma.product.update({
+              where: { id: item.productId },
+              data: {
+                mrp: Number(item.updateProductPricing.mrp) || undefined,
+                sellingPrice: Number(item.updateProductPricing.sellingPrice) || undefined,
+                wholesalePrice: Number(item.updateProductPricing.wholesalePrice) || undefined
+              }
+            });
+          }
+        }
       } else if (data.type === 'SELLING') {
         // For selling invoices, decrease inventory
         inventoryUpdateResult = await updateInventoryFromSellingInvoice(invoice.id);

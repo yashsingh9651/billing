@@ -5,7 +5,7 @@ import { auth } from '@/app/auth';
 // GET /api/products/[id] - Get a specific product by ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
     // Check authentication
@@ -14,7 +14,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const id = params.id;
+    const { id } = await context.params;
     if (!id) {
       return NextResponse.json({ error: 'Product ID is required' }, { status: 400 });
     }
@@ -41,7 +41,7 @@ export async function GET(
 // PUT /api/products/[id] - Update a specific product
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
     // Check authentication
@@ -50,7 +50,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const id = params.id;
+    const { id } = await context.params;
     if (!id) {
       return NextResponse.json({ error: 'Product ID is required' }, { status: 400 });
     }
@@ -90,10 +90,6 @@ export async function PUT(
         mrp: body.mrp !== undefined ? body.mrp : undefined,
         unit: body.unit !== undefined ? body.unit : undefined,
         barcode: body.barcode !== undefined ? body.barcode : undefined,
-        supplier: body.supplier !== undefined ? body.supplier : undefined,
-        taxRate: body.taxRate !== undefined ? body.taxRate : undefined,
-        description: body.description !== undefined ? body.description : undefined,
-        isActive: body.isActive !== undefined ? body.isActive : undefined,
       },
     });
 
@@ -110,7 +106,7 @@ export async function PUT(
 // DELETE /api/products/[id] - Delete a specific product
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
     // Check authentication
@@ -119,7 +115,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const id = params.id;
+    const { id } = await context.params;
     if (!id) {
       return NextResponse.json({ error: 'Product ID is required' }, { status: 400 });
     }

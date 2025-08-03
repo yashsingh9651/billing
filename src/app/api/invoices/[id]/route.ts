@@ -54,7 +54,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    const { id } = params;
+    const { id } = await params;
     const data = await req.json();
     
     // Check if invoice exists and belongs to the user
@@ -238,7 +238,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    const { id } = params;
+    const { id } = await params;
     
     // Check if invoice exists and belongs to the user
     const existingInvoice = await prisma.invoice.findUnique({

@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { ArrowDownIcon, ArrowUpIcon } from '@heroicons/react/20/solid';
 import { CurrencyDollarIcon, ShoppingBagIcon, DocumentTextIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
+import { useGetDashboardStatsQuery } from '@/redux/services/dashboardApiSlice';
 
 function classNames(...classes: string[]) {
   return classes.filter(Boolean).join(' ');
@@ -13,8 +13,8 @@ interface StatCardProps {
   title: string;
   value: string;
   icon: React.ElementType;
-  change: number;
-  changeType: 'increase' | 'decrease';
+  change?: number;
+  changeType?: 'increase' | 'decrease';
   href: string;
 }
 
@@ -38,22 +38,24 @@ function StatCard({ title, value, icon: Icon, change, changeType, href }: StatCa
       </div>
       <div className="bg-gray-50 px-5 py-3">
         <div className="flex items-center justify-between">
-          <div className="text-sm">
-            <span
-              className={classNames(
-                changeType === 'increase' ? 'text-green-600' : 'text-red-600',
-                'inline-flex items-center'
-              )}
-            >
-              {changeType === 'increase' ? (
-                <ArrowUpIcon className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
-              ) : (
-                <ArrowDownIcon className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
-              )}
-              {change}%
-            </span>
-            <span className="ml-1 text-gray-500">from last month</span>
-          </div>
+          {change !== undefined && changeType && (
+            <div className="text-sm">
+              <span
+                className={classNames(
+                  changeType === 'increase' ? 'text-green-600' : 'text-red-600',
+                  'inline-flex items-center'
+                )}
+              >
+                {changeType === 'increase' ? (
+                  <ArrowUpIcon className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
+                ) : (
+                  <ArrowDownIcon className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
+                )}
+                {change}%
+              </span>
+              <span className="ml-1 text-gray-500">from last month</span>
+            </div>
+          )}
           <Link href={href} className="text-sm font-medium text-indigo-600 hover:text-indigo-500">
             View all
           </Link>
@@ -63,67 +65,35 @@ function StatCard({ title, value, icon: Icon, change, changeType, href }: StatCa
   );
 }
 
-interface RecentActivity {
-  id: string;
-  type: 'invoice' | 'product';
-  title: string;
-  date: string;
-  amount?: string;
-}
-
 export default function Home() {
-  const [stats, setStats] = useState({
-    totalSales: '₹0',
-    totalProducts: '0',
-    totalInvoices: '0',
-    lowStock: '0',
-  });
-  
-  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: dashboardData, isLoading, error } = useGetDashboardStatsQuery();
 
-  useEffect(() => {
-    // Simulate API call to fetch dashboard data
-    setTimeout(() => {
-      setStats({
-        totalSales: '₹45,000',
-        totalProducts: '24',
-        totalInvoices: '18',
-        lowStock: '3',
-      });
-      
-      setRecentActivity([
-        {
-          id: '1',
-          type: 'invoice',
-          title: 'Invoice #INV-001 created',
-          date: '2 hours ago',
-          amount: '₹5,600',
-        },
-        {
-          id: '2',
-          type: 'product',
-          title: 'Added 5 units of Product A',
-          date: '4 hours ago',
-        },
-        {
-          id: '3',
-          type: 'invoice',
-          title: 'Invoice #INV-002 paid',
-          date: '1 day ago',
-          amount: '₹12,400',
-        },
-        {
-          id: '4',
-          type: 'product',
-          title: 'Updated stock for Product B',
-          date: '2 days ago',
-        },
-      ]);
-      
-      setIsLoading(false);
-    }, 1000);
-  }, []);
+  // Format currency
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+
+  // Format recent activity dates
+  const formatActivityDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      return 'Today';
+    } else if (diffDays === 1) {
+      return 'Yesterday';
+    } else if (diffDays < 7) {
+      return `${diffDays} days ago`;
+    } else {
+      return date.toLocaleDateString();
+    }
+  };
 
   if (isLoading) {
     return (
@@ -132,6 +102,32 @@ export default function Home() {
       </div>
     );
   }
+
+  if (error) {
+    return (
+      <div className="py-6">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <p className="text-red-500">Error loading dashboard data. Please try again.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const stats = dashboardData ? {
+    totalSales: formatCurrency(dashboardData.totalAmountReceived),
+    totalProducts: dashboardData.totalProducts.toString(),
+    totalInvoices: dashboardData.totalInvoices.toString(),
+    lowStock: dashboardData.lowStockItems.toString(),
+    totalSpent: formatCurrency(dashboardData.totalAmountSpent),
+  } : {
+    totalSales: '₹0',
+    totalProducts: '0',
+    totalInvoices: '0',
+    lowStock: '0',
+    totalSpent: '₹0',
+  };
 
   return (
     <div>
@@ -146,32 +142,40 @@ export default function Home() {
           title="Total Sales"
           value={stats.totalSales}
           icon={CurrencyDollarIcon}
-          change={12}
-          changeType="increase"
+          change={dashboardData?.salesChange || 0}
+          changeType={dashboardData?.salesChangeType || 'increase'}
+          href="/invoices"
+        />
+        <StatCard
+          title="Total Spent"
+          value={stats.totalSpent}
+          icon={CurrencyDollarIcon}
+          change={dashboardData?.spentChange || 0}
+          changeType={dashboardData?.spentChangeType || 'increase'}
           href="/invoices"
         />
         <StatCard
           title="Total Products"
           value={stats.totalProducts}
           icon={ShoppingBagIcon}
-          change={5}
-          changeType="increase"
+          change={dashboardData?.productsChange || 0}
+          changeType={dashboardData?.productsChangeType || 'increase'}
           href="/products"
         />
         <StatCard
           title="Total Invoices"
           value={stats.totalInvoices}
           icon={DocumentTextIcon}
-          change={8}
-          changeType="increase"
+          change={dashboardData?.invoicesChange || 0}
+          changeType={dashboardData?.invoicesChangeType || 'increase'}
           href="/invoices"
         />
         <StatCard
           title="Low Stock Items"
           value={stats.lowStock}
           icon={ExclamationCircleIcon}
-          change={2}
-          changeType="decrease"
+          change={dashboardData?.lowStockChange || 0}
+          changeType={dashboardData?.lowStockChangeType || 'decrease'}
           href="/products?filter=low-stock"
         />
       </div>
@@ -181,26 +185,31 @@ export default function Home() {
         <div className="mt-5 flow-root">
           <div className="overflow-hidden rounded-lg bg-white shadow">
             <ul role="list" className="divide-y divide-gray-200">
-              {recentActivity.map((activity) => (
+              {dashboardData && dashboardData.recentActivity.map((activity) => (
                 <li key={activity.id} className="p-4 sm:px-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
-                      {activity.type === 'invoice' ? (
-                        <DocumentTextIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
-                      ) : (
-                        <ShoppingBagIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
-                      )}
-                      <p className="ml-2 text-sm font-medium text-gray-900">{activity.title}</p>
+                      <DocumentTextIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                      <div className="ml-2">
+                        <p className="text-sm font-medium text-gray-900">{activity.title}</p>
+                        <p className="text-xs text-gray-500">{activity.partyName}</p>
+                      </div>
                     </div>
                     <div className="flex items-center">
-                      {activity.amount && (
-                        <span className="mr-4 text-sm font-medium text-gray-900">{activity.amount}</span>
-                      )}
-                      <time className="text-sm text-gray-500">{activity.date}</time>
+                      <span className={`mr-4 text-sm font-medium ${activity.invoiceType === 'SELLING' ? 'text-green-600' : 'text-red-600'}`}>
+                        {activity.invoiceType === 'SELLING' ? '+' : '-'}{formatCurrency(activity.amount)}
+                      </span>
+                      <time className="text-sm text-gray-500">{formatActivityDate(activity.date)}</time>
                     </div>
                   </div>
                 </li>
               ))}
+              
+              {(!dashboardData || dashboardData.recentActivity.length === 0) && (
+                <li className="p-4 sm:px-6 text-center text-gray-500">
+                  No recent activity found
+                </li>
+              )}
             </ul>
           </div>
         </div>

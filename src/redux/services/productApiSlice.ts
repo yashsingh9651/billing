@@ -12,7 +12,6 @@ export interface Product {
   unit: string;
   barcode?: string;
   supplier?: string;
-  taxRate: number;
   description?: string;
   isActive: boolean;
   createdAt: string;
@@ -30,7 +29,6 @@ export interface ProductCreateInput {
   unit: string;
   barcode?: string;
   supplier?: string;
-  taxRate: number;
   description?: string;
   isActive?: boolean;
 }

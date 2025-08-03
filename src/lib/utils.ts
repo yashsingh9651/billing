@@ -25,9 +25,19 @@ export const formatDate = (dateString: string): string => {
  * Calculate the amount for an invoice item
  */
 export const calculateAmount = (quantity: number, rate: number, discount: number): number => {
-  const amount = quantity * rate;
-  const discountAmount = (amount * discount) / 100;
-  return amount - discountAmount;
+  // Parse inputs to ensure they're numbers and use default of 0 for NaN values
+  const qty = parseFloat(quantity?.toString() || '0');
+  const rt = parseFloat(rate?.toString() || '0');
+  const disc = parseFloat(discount?.toString() || '0');
+  
+  if (isNaN(qty) || isNaN(rt) || isNaN(disc)) {
+    return 0;
+  }
+  
+  const amount = qty * rt;
+  const discountAmount = (amount * disc) / 100;
+  // Return value with 2 decimal places as a number
+  return parseFloat((amount - discountAmount).toFixed(2));
 };
 
 /**
