@@ -371,7 +371,8 @@ export default function InvoiceDetailsPage() {
 
       // Only draw vertical line for rate column
       xPos = margin;
-      for (let i = 0; i < 5; i++) xPos += colWidths[i];
+      // Calculate position for tax rate column
+      for (let i = 0; i < 6; i++) xPos += colWidths[i]; // Adjusted to account for HSN code column
       pdf.text(`${invoice.cgstRate || 0}%`, xPos + 1, yPos + 5);
 
       // Only draw amount at the right position
@@ -400,11 +401,11 @@ export default function InvoiceDetailsPage() {
 
       // Only draw vertical line for rate column
       xPos = margin;
-      for (let i = 0; i < 5; i++) xPos += colWidths[i];
+      for (let i = 0; i < 6; i++) xPos += colWidths[i]; // Adjusted to account for HSN code column
       pdf.text(`${invoice.sgstRate || 0}%`, xPos + 1, yPos + 5);
 
       // Only draw amount at the right position
-      xPos += colWidths[5];
+      xPos += colWidths[6];
       pdf.text(
         sgstAmount.toLocaleString("en-IN", {
           maximumFractionDigits: 2,
@@ -417,7 +418,7 @@ export default function InvoiceDetailsPage() {
       // Draw only the vertical borders for the rate column and right edge, plus bottom border
       pdf.line(margin, yPos, margin, yPos + 8); // Left edge
       xPos = margin;
-      for (let i = 0; i < 6; i++) xPos += colWidths[i];
+      for (let i = 0; i < 6; i++) xPos += colWidths[i]; // Adjusted to account for HSN code column
       pdf.line(xPos, yPos, xPos, yPos + 8); // Before rate
       xPos += colWidths[6];
       pdf.line(xPos, yPos, xPos, yPos + 8); // Right edge
@@ -430,11 +431,11 @@ export default function InvoiceDetailsPage() {
 
         // Only draw vertical line for rate column
         xPos = margin;
-        for (let i = 0; i < 5; i++) xPos += colWidths[i];
+        for (let i = 0; i < 6; i++) xPos += colWidths[i]; // Adjusted to account for HSN code column
         pdf.text(`${invoice.igstRate || 0}%`, xPos + 1, yPos + 5);
 
         // Only draw amount at the right position
-        xPos += colWidths[5];
+        xPos += colWidths[6];
         pdf.text(
           igstAmount.toLocaleString("en-IN", {
             maximumFractionDigits: 2,
@@ -447,9 +448,9 @@ export default function InvoiceDetailsPage() {
         // Draw only the vertical borders for the rate column and right edge, plus bottom border
         pdf.line(margin, yPos, margin, yPos + 8); // Left edge
         xPos = margin;
-        for (let i = 0; i < 5; i++) xPos += colWidths[i];
+        for (let i = 0; i < 6; i++) xPos += colWidths[i]; // Adjusted to account for HSN code column
         pdf.line(xPos, yPos, xPos, yPos + 8); // Before rate
-        xPos += colWidths[5];
+        xPos += colWidths[6];
         pdf.line(xPos, yPos, xPos, yPos + 8); // Right edge
         pdf.line(margin, yPos + 8, margin + contentWidth, yPos + 8); // Bottom line
         yPos += 8;
@@ -520,6 +521,7 @@ export default function InvoiceDetailsPage() {
       // Tax breakdown table
       pdf.setFontSize(7);
       const taxTableHeaders = [
+        "HSN Code",
         "Taxable Value",
         "Central Tax Rate",
         "Amount",
@@ -527,7 +529,7 @@ export default function InvoiceDetailsPage() {
         "Amount",
         "Total Tax Amount",
       ];
-      const taxColWidths = [35, 30, 25, 30, 25, 45];
+      const taxColWidths = [20, 25, 25, 20, 25, 20, 35];
 
       // Tax table header
       pdf.setFillColor(240, 240, 240);
@@ -546,6 +548,13 @@ export default function InvoiceDetailsPage() {
 
       // Tax table data row
       xPos = margin;
+      // HSN code
+      pdf.text(
+        invoice.items.length > 0 ? (invoice.items[0].hsnCode || 'N/A') : 'N/A',
+        xPos + 1,
+        yPos + 5
+      );
+      xPos += taxColWidths[0];
       // Format currency directly for PDF
       pdf.text(
         invoice.subtotal.toLocaleString("en-IN", {
@@ -605,6 +614,7 @@ export default function InvoiceDetailsPage() {
       pdf.setFont("helvetica", "bold");
       xPos = margin;
       pdf.text("Total", xPos + 1, yPos + 5);
+      xPos += taxColWidths[0];
       // Format currency directly for PDF
       pdf.text(
         invoice.subtotal.toLocaleString("en-IN", {
@@ -854,6 +864,9 @@ export default function InvoiceDetailsPage() {
                     Description of Goods
                   </th>
                   <th className="border-r border-gray-400 px-2 py-2 text-center font-medium text-gray-900">
+                    HSN Code
+                  </th>
+                  <th className="border-r border-gray-400 px-2 py-2 text-center font-medium text-gray-900">
                     Quantity
                   </th>
                   <th className="border-r border-gray-400 px-2 py-2 text-center font-medium text-gray-900">
@@ -883,6 +896,9 @@ export default function InvoiceDetailsPage() {
                       {item.productName}
                     </td>
                     <td className="border-r border-gray-300 px-2 py-2 text-center">
+                      {item.hsnCode || 'N/A'}
+                    </td>
+                    <td className="border-r border-gray-300 px-2 py-2 text-center">
                       {item.quantity} PCS
                     </td>
                     <td className="border-r border-gray-300 px-2 py-2 text-center">
@@ -902,7 +918,7 @@ export default function InvoiceDetailsPage() {
 
                 {/* Tax Summary Rows */}
                 <tr className="border-b border-gray-300">
-                  <td colSpan={5} className="px-2 pl-4 py-2 font-medium">
+                  <td colSpan={6} className="px-2 pl-4 py-2 font-medium">
                     Output CGST
                   </td>
                   <td className="border-r border-gray-300 px-2 py-2 text-center">
@@ -913,7 +929,7 @@ export default function InvoiceDetailsPage() {
                   </td>
                 </tr>
                 <tr className="border-b border-gray-300">
-                  <td colSpan={5} className="px-2 pl-4 py-2 font-medium">
+                  <td colSpan={6} className="px-2 pl-4 py-2 font-medium">
                     Output SGST
                   </td>
                   <td className="border-r border-gray-300 px-2 py-2 text-center">
@@ -925,7 +941,7 @@ export default function InvoiceDetailsPage() {
                 </tr>
                 {taxAmounts.igst > 0 && (
                   <tr className="border-b border-gray-300">
-                    <td colSpan={5} className="px-2 pl-4 py-2 font-medium">
+                    <td colSpan={6} className="px-2 pl-4 py-2 font-medium">
                       Output IGST
                     </td>
                     <td className="border-r border-gray-300 px-2 py-2 text-center">
@@ -937,7 +953,7 @@ export default function InvoiceDetailsPage() {
                   </tr>
                 )}
                 <tr className="border-b border-gray-300">
-                  <td colSpan={6} className="px-2 pl-4 py-2 font-medium">
+                  <td colSpan={7} className="px-2 pl-4 py-2 font-medium">
                     ROUND OFF
                   </td>
                   <td className="px-2 py-2 pr-4 text-right">
@@ -946,22 +962,22 @@ export default function InvoiceDetailsPage() {
                 </tr>
                 {/* Add 5 empty rows for spacing between roundoff and total */}
                 <tr className="h-6">
-                  <td colSpan={7}></td>
+                  <td colSpan={8}></td>
                 </tr>
                 <tr className="h-6">
-                  <td colSpan={7}></td>
+                  <td colSpan={8}></td>
                 </tr>
                 <tr className="h-6">
-                  <td colSpan={7}></td>
+                  <td colSpan={8}></td>
                 </tr>
                 <tr className="h-6">
-                  <td colSpan={7}></td>
+                  <td colSpan={8}></td>
                 </tr>
                 <tr className="h-6">
-                  <td colSpan={7}></td>
+                  <td colSpan={8}></td>
                 </tr>
                 <tr className="border-b-2 border-gray-900">
-                  <td colSpan={6} className="px-2 pl-4 py-2 font-bold">
+                  <td colSpan={7} className="px-2 pl-4 py-2 font-bold">
                     Total
                   </td>
                   <td className="px-2 py-2 pr-4 text-right font-bold">
@@ -988,6 +1004,9 @@ export default function InvoiceDetailsPage() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="border border-gray-300 px-2 py-1 text-center">
+                    HSN Code
+                  </th>
+                  <th className="border border-gray-300 px-2 py-1 text-center">
                     Taxable Value
                   </th>
                   <th className="border border-gray-300 px-2 py-1 text-center">
@@ -1010,6 +1029,9 @@ export default function InvoiceDetailsPage() {
               <tbody>
                 <tr>
                   <td className="border border-gray-300 px-2 py-1 text-center">
+                    {invoice.items.length > 0 ? invoice.items[0].hsnCode || 'N/A' : 'N/A'}
+                  </td>
+                  <td className="border border-gray-300 px-2 py-1 text-center">
                     {formatCurrency(invoice.subtotal)}
                   </td>
                   <td className="border border-gray-300 px-2 py-1 text-center">
@@ -1029,6 +1051,9 @@ export default function InvoiceDetailsPage() {
                   </td>
                 </tr>
                 <tr className="font-bold">
+                  <td className="border border-gray-300 px-2 py-1 text-center">
+                    Total
+                  </td>
                   <td className="border border-gray-300 px-2 py-1 text-center">
                     {formatCurrency(invoice.subtotal)}
                   </td>

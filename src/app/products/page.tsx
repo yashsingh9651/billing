@@ -176,6 +176,9 @@ export default function ProductsPage() {
                         Quantity
                       </th>
                       <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                        HSN Code
+                      </th>
+                      <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
                         Buying Price
                       </th>
                       <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
@@ -197,6 +200,9 @@ export default function ProductsPage() {
                         </td>
                         <td className={`whitespace-nowrap px-3 py-4 text-sm ${product.quantity <= 5 ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
                           {product.quantity} {product.unit}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                          {product.hsnCode || 'N/A'}
                         </td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">₹ {product.buyingPrice.toFixed(2)}</td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">₹ {product.sellingPrice.toFixed(2)}</td>
