@@ -42,6 +42,7 @@ model Product {
   mrp               Float
   unit              String          // piece, kg, dozen, etc.
   barcode           String?
+  hsnCode           String?         // HSN code for GST classification
   invoiceItems      InvoiceItem[]
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
@@ -53,6 +54,7 @@ model Invoice {
   invoiceNumber     String        @unique
   date              DateTime      @default(now())
   type              InvoiceType
+  status            String        @default("DRAFT")
   
   // Sender info (only required for BUYING type)
   senderName        String
@@ -91,6 +93,7 @@ model InvoiceItem {
   rate              Float
   discount          Float     @default(0)
   amount            Float
+  hsnCode           String?   // HSN code for GST classification
   
   // Relations
   invoiceId         String

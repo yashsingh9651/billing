@@ -11,6 +11,7 @@ export interface Product {
   mrp: number;
   unit: string;
   barcode?: string;
+  hsnCode?: string;
   supplier?: string;
   description?: string;
   createdAt: string;
@@ -27,6 +28,7 @@ export interface ProductCreateInput {
   mrp: number;
   unit: string;
   barcode?: string;
+  hsnCode?: string;
   supplier?: string;
   description?: string;
 }

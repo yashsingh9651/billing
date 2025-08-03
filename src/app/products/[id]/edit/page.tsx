@@ -25,6 +25,7 @@ const productSchema = z.object({
   mrp: z.coerce.number().min(0, "MRP cannot be negative"),
   unit: z.string().min(1, "Unit is required"),
   barcode: z.string().optional(),
+  hsnCode: z.string().optional(),
 });
 
 // Define the type for our form based on Zod schema
@@ -64,6 +65,7 @@ export default function EditProductPage() {
       mrp: 0,
       unit: "piece",
       barcode: "",
+      hsnCode: "",
     },
   });
 
@@ -80,6 +82,7 @@ export default function EditProductPage() {
         mrp: product.mrp,
         unit: product.unit,
         barcode: product.barcode || "",
+        hsnCode: product.hsnCode || "",
       });
     }
   }, [product, reset]);
@@ -234,6 +237,18 @@ export default function EditProductPage() {
                   type="text"
                   id="barcode"
                   {...register("barcode")}
+                  className="mt-1 block w-full p-2 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="hsnCode" className="block text-sm font-medium text-gray-700">
+                  HSN Code (Optional)
+                </label>
+                <input
+                  type="text"
+                  id="hsnCode"
+                  {...register("hsnCode")}
                   className="mt-1 block w-full p-2 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 />
               </div>

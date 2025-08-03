@@ -19,6 +19,7 @@ const invoiceItemSchema = z.object({
   rate: z.coerce.number().positive('Rate must be greater than 0'),
   discount: z.coerce.number().min(0, 'Discount cannot be negative').max(100, 'Discount cannot be more than 100%'),
   amount: z.coerce.number().min(0, 'Amount must be 0 or greater'),
+  hsnCode: z.string().optional(),
   // New fields for buying invoices
   mrp: z.coerce.number().min(0, 'MRP cannot be negative').optional(),
   sellingPrice: z.coerce.number().min(0, 'Selling price cannot be negative').optional(),
@@ -127,6 +128,7 @@ const CreateInvoicePage = () => {
           quantity: 1,
           rate: 0,
           discount: 0,
+          hsnCode: '',
           amount: 0,
           mrp: 0,
           sellingPrice: 0,
@@ -292,6 +294,7 @@ const CreateInvoicePage = () => {
     setValue(`items.${index}.quantity`, currentQty);
     setValue(`items.${index}.rate`, rate);
     setValue(`items.${index}.discount`, discount);
+    setValue(`items.${index}.hsnCode`, product.hsnCode || '');
     
     // For SELLING invoices, check if the requested quantity exceeds available stock
     if (watchType === 'SELLING' && product.quantity !== undefined) {
@@ -411,6 +414,7 @@ const CreateInvoicePage = () => {
       quantity: 1,
       rate: 0,
       discount: 0,
+      hsnCode: '',
       amount: 0,
       mrp: 0,
       sellingPrice: 0,
@@ -459,7 +463,8 @@ const CreateInvoicePage = () => {
           updateProductPricing: invoiceType === 'BUYING' && item.productId ? {
             mrp: Number(item.mrp || 0),
             sellingPrice: Number(item.sellingPrice || 0),
-            wholesalePrice: Number(item.wholesalePrice || 0)
+            wholesalePrice: Number(item.wholesalePrice || 0),
+            hsnCode: item.hsnCode || ''
           } : undefined
         })),
         cgstRate: parseFloat(data.cgstRate?.toString() || '0'),
@@ -803,6 +808,9 @@ const CreateInvoicePage = () => {
                       <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
                         Amount
                       </th>
+                      <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                        HSN Code
+                      </th>
                       {watchType === 'BUYING' && (
                         <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
                           MRP
@@ -923,6 +931,14 @@ const CreateInvoicePage = () => {
                             {...register(`items.${index}.amount`)}
                             readOnly
                             className="block w-24 rounded-md border-0 py-1.5 px-3 text-gray-900 bg-gray-100 shadow-sm placeholder:text-gray-400 focus:ring-0 sm:text-sm sm:leading-6 font-bold"
+                          />
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                          <input
+                            type="text"
+                            {...register(`items.${index}.hsnCode`)}
+                            className="block w-24 rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                            placeholder="HSN Code"
                           />
                         </td>
                         {watchType === 'BUYING' && (

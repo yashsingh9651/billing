@@ -177,6 +177,7 @@ export async function POST(req: NextRequest) {
             discount: item.discount || 0,
             amount: item.amount,
             productId: item.productId,
+            hsnCode: item.hsnCode || null,
           })),
         },
       },
@@ -203,7 +204,8 @@ export async function POST(req: NextRequest) {
               data: {
                 mrp: Number(item.updateProductPricing.mrp) || undefined,
                 sellingPrice: Number(item.updateProductPricing.sellingPrice) || undefined,
-                wholesalePrice: Number(item.updateProductPricing.wholesalePrice) || undefined
+                wholesalePrice: Number(item.updateProductPricing.wholesalePrice) || undefined,
+                hsnCode: item.updateProductPricing.hsnCode || undefined
               }
             });
           }

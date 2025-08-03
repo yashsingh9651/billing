@@ -157,15 +157,11 @@ export async function DELETE(
     });
 
     if (invoiceItems) {
-      // Instead of hard delete, soft delete by marking as inactive
-      const updatedProduct = await prisma.product.delete({
-        where: { id },
-      });
-
+      // Return an error if the product is used in invoices
       return NextResponse.json({
-        ...updatedProduct,
-        message: "Product marked as inactive because it is used in invoices",
-      });
+        error: "Cannot delete product because it is used in invoices",
+        details: "This product is referenced in one or more invoices and cannot be deleted. Consider updating the quantity to zero instead.",
+      }, { status: 400 });
     }
 
     // Delete product if not used in any invoices

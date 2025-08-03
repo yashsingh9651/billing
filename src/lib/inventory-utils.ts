@@ -63,14 +63,6 @@ export async function updateInventoryFromBuyingInvoice(invoiceId: string) {
       })
     );
 
-    // If the invoice status is still DRAFT, update it to FINALIZED
-    if (invoice.status === 'DRAFT') {
-      await prisma.invoice.update({
-        where: { id: invoiceId },
-        data: { status: 'FINALIZED' },
-      });
-    }
-
     return {
       success: true,
       message: 'Inventory updated successfully',
@@ -157,14 +149,6 @@ export async function updateInventoryFromSellingInvoice(invoiceId: string) {
 
     // Check if any item failed due to insufficient inventory
     const hasInsufficientInventory = updateResults.some(result => !result.success && result.message?.includes('Insufficient inventory'));
-
-    // If no inventory issues and the invoice status is still DRAFT, update it to FINALIZED
-    if (!hasInsufficientInventory && invoice.status === 'DRAFT') {
-      await prisma.invoice.update({
-        where: { id: invoiceId },
-        data: { status: 'FINALIZED' },
-      });
-    }
 
     return {
       success: !hasInsufficientInventory,

@@ -42,6 +42,7 @@ const productSchema = z.object({
     .refine((val) => val >= 0, { message: 'MRP cannot be negative' }),
   unit: z.string().min(1, 'Unit is required'),
   barcode: z.string().optional(),
+  hsnCode: z.string().optional(),
 });
 
 // Use z.infer to get the proper types
@@ -70,6 +71,7 @@ export default function AddProductPage() {
       mrp: 0,
       unit: 'piece',
       barcode: '',
+      hsnCode: '',
     },
   });
 
@@ -172,6 +174,24 @@ export default function AddProductPage() {
                   />
                   {errors.barcode && (
                     <p className="mt-2 text-sm text-red-600">{errors.barcode.message}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="sm:col-span-3">
+                <label htmlFor="hsnCode" className="block text-sm font-medium leading-6 text-gray-900">
+                  HSN Code (Optional)
+                </label>
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    id="hsnCode"
+                    {...register('hsnCode')}
+                    className="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                    placeholder="e.g., 1234"
+                  />
+                  {errors.hsnCode && (
+                    <p className="mt-2 text-sm text-red-600">{errors.hsnCode.message}</p>
                   )}
                 </div>
               </div>

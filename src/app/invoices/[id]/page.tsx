@@ -279,13 +279,14 @@ export default function InvoiceDetailsPage() {
       const tableHeaders = [
         "Sl",
         "Description of Goods",
+        "HSN Code",
         "Quantity",
         "Rate",
         "Per",
         "Disc %",
         "Amount",
       ];
-      const colWidths = [15, 85, 20, 20, 15, 15, 30];
+      const colWidths = [15, 65, 20, 20, 20, 15, 15, 30];
 
       // Table header
       pdf.setFillColor(240, 240, 240);
@@ -316,6 +317,9 @@ export default function InvoiceDetailsPage() {
 
         pdf.text(item.productName, xPos + 1, yPos + 5);
         xPos += colWidths[1];
+
+        pdf.text(item.hsnCode || 'N/A', xPos + 1, yPos + 5);
+        xPos += colWidths[2];
 
         pdf.text(`${item.quantity} PCS`, xPos + 1, yPos + 5);
         xPos += colWidths[2];

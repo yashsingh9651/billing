@@ -27,9 +27,11 @@ export default function ProductDetailPage() {
       try {
         await deleteProduct(productId).unwrap();
         router.push('/products');
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to delete the product:', error);
-        alert('Failed to delete the product. Please try again.');
+        // Display more specific error message if available
+        const errorMessage = error?.data?.details || error?.data?.error || 'Failed to delete the product. Please try again.';
+        alert(errorMessage);
         setIsDeleting(false);
       }
     }
@@ -128,6 +130,11 @@ export default function ProductDetailPage() {
               <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
                 <dt className="text-sm font-medium text-gray-500">Barcode</dt>
                 <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{product.barcode || 'N/A'}</dd>
+              </div>
+              
+              <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
+                <dt className="text-sm font-medium text-gray-500">HSN Code</dt>
+                <dd className="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">{product.hsnCode || 'N/A'}</dd>
               </div>
               
               <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
