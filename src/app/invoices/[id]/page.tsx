@@ -164,7 +164,7 @@ export default function InvoiceDetailsPage() {
       };
 
   // Handle download PDF with Indian GST format
-  const handleDownloadPdf = async () => {
+  const handleDownloadPdf = async (type: 'original' | 'duplicate') => {
     setIsPdfGenerating(true);
 
     try {
@@ -182,12 +182,19 @@ export default function InvoiceDetailsPage() {
       // Generate QR Code
       const qrData = `Invoice: ${invoice.invoiceNumber}, Date: ${invoice.date}, Amount: ${taxAmounts.totalAmount}, GSTIN: ${invoice.senderGST}`;
 
-      // Header - Tax Invoice
+      // Header - Tax Invoice (Centered)
       pdf.setFontSize(16);
       pdf.setFont("helvetica", "bold");
-      pdf.text("Tax Invoice", margin, margin + 10);
+      // Center the "Tax Invoice" text
+      const textWidth = pdf.getStringUnitWidth("Tax Invoice") * 16 / pdf.internal.scaleFactor;
+      const textX = (pageWidth - textWidth) / 2;
+      pdf.text("Tax Invoice", textX, margin + 10);
+      
+      // Add Original/Duplicate label below
       pdf.setFontSize(10);
-      pdf.text("(ORIGINAL FOR RECIPIENT)", margin, margin + 16);
+      const subTextWidth = pdf.getStringUnitWidth(type === 'original' ? "(ORIGINAL FOR RECIPIENT)" : "(DUPLICATE TRANSPORT COPY)") * 10 / pdf.internal.scaleFactor;
+      const subTextX = (pageWidth - subTextWidth) / 2;
+      pdf.text(type === 'original' ? "(ORIGINAL FOR RECIPIENT)" : "(DUPLICATE TRANSPORT COPY)", subTextX, margin + 16);
 
       // e-Invoice label
       pdf.text("e-Invoice", pageWidth - margin - 25, margin + 10);
@@ -691,7 +698,7 @@ export default function InvoiceDetailsPage() {
       pdf.setFontSize(7);
       pdf.text("This is a Computer Generated Invoice", pageWidth / 2 - 20, 280);
 
-      pdf.save(`Tax-Invoice-${invoice.invoiceNumber || params.id}.pdf`);
+      pdf.save(`Tax-Invoice-${invoice.invoiceNumber || params.id}-${type}.pdf`);
     } catch (error) {
       console.error("Error generating PDF:", error);
       alert(
@@ -746,7 +753,7 @@ export default function InvoiceDetailsPage() {
           <div className="mt-4 flex gap-3 sm:mt-0">
             <button
               type="button"
-              onClick={handleDownloadPdf}
+              onClick={() => handleDownloadPdf('original')}
               disabled={isPdfGenerating}
               className="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50"
             >
@@ -754,7 +761,20 @@ export default function InvoiceDetailsPage() {
                 className="-ml-0.5 mr-1.5 h-5 w-5"
                 aria-hidden="true"
               />
-              {isPdfGenerating ? "Generating..." : "Download Tax Invoice PDF"}
+              {isPdfGenerating ? "Generating..." : "Original Invoice"}
+            </button>
+            
+            <button
+              type="button"
+              onClick={() => handleDownloadPdf('duplicate')}
+              disabled={isPdfGenerating}
+              className="inline-flex items-center rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500 disabled:opacity-50"
+            >
+              <DocumentArrowDownIcon
+                className="-ml-0.5 mr-1.5 h-5 w-5"
+                aria-hidden="true"
+              />
+              {isPdfGenerating ? "Generating..." : "Duplicate Invoice"}
             </button>
           </div>
         </div>
@@ -765,13 +785,11 @@ export default function InvoiceDetailsPage() {
           className="bg-white shadow-lg rounded-lg overflow-hidden"
         >
           {/* Header Section */}
-          <div className="flex border-b-2 border-gray-900 bg-white px-6 py-4 justify-between items-start">
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">Tax Invoice</h1>
-              <p className="text-sm text-gray-600">(ORIGINAL FOR RECIPIENT)</p>
-            </div>
-            <div className="text-right">
-              <div className="text-sm font-semibold mb-2">e-Invoice</div>
+          <div className="flex border-b-2 border-gray-900 bg-white px-6 py-4 justify-center items-center flex-col">
+            <h1 className="text-xl font-bold text-gray-900">Tax Invoice</h1>
+            <p className="text-sm text-gray-600">(ORIGINAL FOR RECIPIENT)</p>
+            <div className="absolute right-8 top-56">
+              <div className="text-sm font-semibold">e-Invoice</div>
             </div>
           </div>
 
