@@ -23,28 +23,6 @@ const formatDate = (dateString: string): string => {
   }).format(date);
 };
 
-// Status badge component
-const StatusBadge = ({
-  status,
-}: {
-  status: "DRAFT" | "FINALIZED" | "PAID" | "CANCELLED";
-}) => {
-  const statusStyles = {
-    PAID: "bg-green-100 text-green-800 border-green-200",
-    FINALIZED: "bg-blue-100 text-blue-800 border-blue-200",
-    DRAFT: "bg-gray-100 text-gray-800 border-gray-200",
-    CANCELLED: "bg-red-100 text-red-800 border-red-200",
-  };
-
-  return (
-    <span
-      className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium border ${statusStyles[status]}`}
-    >
-      {status}
-    </span>
-  );
-};
-
 // Function to convert number to words (Indian format)
 const numberToWords = (num: number): string => {
   const ones = [
